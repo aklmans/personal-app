@@ -24,6 +24,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { BookmarksProvider } from "@/context/BookmarksContext";
 import { HistoryProvider } from "@/context/HistoryContext";
 import { LanguageProvider } from "@/context/LanguageContext";
+import { NotificationsProvider } from "@/context/NotificationsContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { useColors } from "@/hooks/useColors";
 
@@ -94,9 +95,11 @@ function AppProviders({ children }: { children: React.ReactNode }) {
           <LanguageProvider>
             <BookmarksProvider>
               <HistoryProvider>
-                <GestureHandlerRootView>
-                  <KeyboardProvider>{children}</KeyboardProvider>
-                </GestureHandlerRootView>
+                <NotificationsProvider>
+                  <GestureHandlerRootView>
+                    <KeyboardProvider>{children}</KeyboardProvider>
+                  </GestureHandlerRootView>
+                </NotificationsProvider>
               </HistoryProvider>
             </BookmarksProvider>
           </LanguageProvider>

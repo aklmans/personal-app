@@ -7,6 +7,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   View,
 } from "react-native";
@@ -17,6 +18,7 @@ import { fonts } from "@/constants/fonts";
 import { useBookmarks } from "@/context/BookmarksContext";
 import { useHistory } from "@/context/HistoryContext";
 import { useLanguage } from "@/context/LanguageContext";
+import { useNotifications } from "@/context/NotificationsContext";
 import { useTheme, type ThemePreference } from "@/context/ThemeContext";
 import { useColors } from "@/hooks/useColors";
 
@@ -41,6 +43,7 @@ export default function MoreScreen() {
   const router = useRouter();
   const { bookmarks, toggleBookmark } = useBookmarks();
   const { history, clearHistory } = useHistory();
+  const { optedIn, permissionStatus, isLoading, enable, disable } = useNotifications();
   const topPad = Platform.OS === "web" ? Math.max(insets.top, 67) : insets.top;
 
   const openUrl = useCallback(async (url: string) => {
@@ -390,6 +393,54 @@ export default function MoreScreen() {
           </Pressable>
         </View>
 
+        {Platform.OS !== "web" && (
+          <View
+            style={[
+              styles.settingRow,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+              },
+            ]}
+          >
+            <View style={styles.rowLeft}>
+              <View
+                style={[styles.iconWrap, { backgroundColor: colors.secondary }]}
+              >
+                <Feather name="bell" size={17} color={colors.primary} />
+              </View>
+              <View>
+                <Text
+                  style={[
+                    styles.rowLabel,
+                    { color: colors.text, fontFamily: fonts.sans.medium },
+                  ]}
+                >
+                  {isZh ? "新文章通知" : "New Post Alerts"}
+                </Text>
+                {permissionStatus === "denied" && !optedIn && (
+                  <Text
+                    style={[
+                      styles.notifHint,
+                      { color: colors.mutedForeground, fontFamily: fonts.sans.regular },
+                    ]}
+                  >
+                    {isZh ? "请在系统设置中允许通知" : "Enable in system settings"}
+                  </Text>
+                )}
+              </View>
+            </View>
+            <Switch
+              value={optedIn}
+              onValueChange={(val) => (val ? enable() : disable())}
+              disabled={isLoading || (permissionStatus === "denied" && !optedIn)}
+              trackColor={{ false: colors.border, true: colors.primary }}
+              thumbColor="#ffffff"
+              testID="notifications-toggle"
+            />
+          </View>
+        )}
+
         <View
           style={[
             styles.themeBlock,
@@ -597,6 +648,10 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     lineHeight: 18,
+  },
+  notifHint: {
+    fontSize: 11,
+    marginTop: 2,
   },
   bookmarkRow: {
     flexDirection: "row",
