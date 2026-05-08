@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { XMLParser } from "fast-xml-parser";
+import { logger } from "../lib/logger";
 
 const router = Router();
 
@@ -40,13 +41,41 @@ interface CacheEntry {
 
 const cache: Record<string, CacheEntry> = {};
 const CACHE_TTL = 5 * 60 * 1000;
+const STALE_TTL = 30 * 60 * 1000;
+
+const refreshInProgress: Record<string, boolean> = {};
+const inFlightFetches: Map<string, Promise<BlogPost[]>> = new Map();
 
 const contentCache: Map<string, { html: string; ts: number }> = new Map();
 const CONTENT_TTL = 15 * 60 * 1000;
 
-const sitemapCache: { urls: string[]; ts: number } | null = null;
 const SITEMAP_CACHE_TTL = 10 * 60 * 1000;
-let _sitemapCache: { urls: string[]; ts: number } | null = sitemapCache;
+let _sitemapCache: { urls: string[]; ts: number } | null = null;
+
+const SCRAPE_CONCURRENCY = 5;
+
+async function withConcurrencyLimit<T>(
+  tasks: (() => Promise<T>)[],
+  limit: number
+): Promise<PromiseSettledResult<T>[]> {
+  const results: PromiseSettledResult<T>[] = new Array(tasks.length);
+  let index = 0;
+
+  async function worker() {
+    while (index < tasks.length) {
+      const i = index++;
+      try {
+        results[i] = { status: "fulfilled", value: await tasks[i]!() };
+      } catch (e) {
+        results[i] = { status: "rejected", reason: e };
+      }
+    }
+  }
+
+  const workers = Array.from({ length: Math.min(limit, tasks.length) }, worker);
+  await Promise.all(workers);
+  return results;
+}
 
 function extractArticleHtml(pageHtml: string): string {
   const articleMatch = pageHtml.match(/<article[^>]*>([\s\S]*?)<\/article>/i);
@@ -245,14 +274,9 @@ function filterSitemapUrlsByLocale(urls: string[], locale: string): string[] {
   return urls.filter((u) => !u.includes(`${SITE_BASE}/zh-cn/`));
 }
 
-async function fetchFeed(locale: string): Promise<BlogPost[]> {
-  const now = Date.now();
-  const entry = cache[locale];
-  if (entry && now - entry.timestamp < CACHE_TTL) {
-    return entry.posts;
-  }
-
-  const url = RSS_FEEDS[locale] ?? RSS_FEEDS["en"];
+async function doFetchFeed(locale: string): Promise<BlogPost[]> {
+  const t0 = Date.now();
+  const url = RSS_FEEDS[locale] ?? RSS_FEEDS["en"]!;
 
   let rssPosts: BlogPost[] = [];
 
@@ -327,15 +351,18 @@ async function fetchFeed(locale: string): Promise<BlogPost[]> {
   );
 
   let sitemapPosts: BlogPost[] = [];
+  let sitemapScrapeCount = 0;
   try {
     const sitemapUrls = await fetchSitemapPostUrls(locale);
     const newUrls = sitemapUrls.filter(
       (u) => !rssPostLinks.has(u.replace(/\/+$/, ""))
     );
+    sitemapScrapeCount = newUrls.length;
 
     if (newUrls.length > 0) {
-      const results = await Promise.allSettled(
-        newUrls.map((u) => fetchPostMetadataFromPage(u, locale))
+      const results = await withConcurrencyLimit(
+        newUrls.map((u) => () => fetchPostMetadataFromPage(u, locale)),
+        SCRAPE_CONCURRENCY
       );
       sitemapPosts = results
         .filter(
@@ -344,8 +371,8 @@ async function fetchFeed(locale: string): Promise<BlogPost[]> {
         )
         .map((r) => r.value);
     }
-  } catch {
-    // ignore sitemap errors
+  } catch (err) {
+    logger.warn({ locale, err }, "blog: sitemap scraping failed");
   }
 
   const allPosts = [...rssPosts, ...sitemapPosts].sort((a, b) => {
@@ -354,9 +381,61 @@ async function fetchFeed(locale: string): Promise<BlogPost[]> {
     return db - da;
   });
 
+  const now = Date.now();
   const posts = allPosts.length > 0 ? allPosts : (cache[locale]?.posts ?? []);
   cache[locale] = { posts, timestamp: now };
+
+  logger.info(
+    {
+      locale,
+      rssCount: rssPosts.length,
+      sitemapScrapeCount,
+      sitemapFound: sitemapPosts.length,
+      totalPosts: posts.length,
+      durationMs: now - t0,
+    },
+    "blog: feed refreshed"
+  );
+
   return posts;
+}
+
+async function fetchFeed(locale: string): Promise<BlogPost[]> {
+  const now = Date.now();
+  const entry = cache[locale];
+
+  if (entry) {
+    const age = now - entry.timestamp;
+
+    if (age < CACHE_TTL) {
+      return entry.posts;
+    }
+
+    if (age < STALE_TTL) {
+      if (!refreshInProgress[locale]) {
+        refreshInProgress[locale] = true;
+        doFetchFeed(locale)
+          .catch((err) => logger.error({ locale, err }, "blog: background refresh failed"))
+          .finally(() => {
+            refreshInProgress[locale] = false;
+          });
+      }
+      return entry.posts;
+    }
+  }
+
+  const inflight = inFlightFetches.get(locale);
+  if (inflight) return inflight;
+
+  const fetch$ = doFetchFeed(locale).finally(() => inFlightFetches.delete(locale));
+  inFlightFetches.set(locale, fetch$);
+  return fetch$;
+}
+
+function warmCache(): void {
+  for (const locale of Object.keys(RSS_FEEDS)) {
+    doFetchFeed(locale).catch(() => {});
+  }
 }
 
 router.get("/posts", async (req, res) => {
@@ -533,5 +612,7 @@ router.get("/search", async (req, res) => {
     res.status(500).json({ error: "Search failed" });
   }
 });
+
+warmCache();
 
 export default router;
