@@ -435,6 +435,23 @@ function buildHtml(
     badge.textContent = lang;
     pre.appendChild(badge);
   }
+  function wrapCode(pre) {
+    var wrapper = document.createElement('div');
+    wrapper.className = 'code-wrapper';
+    pre.parentNode.insertBefore(wrapper, pre);
+    wrapper.appendChild(pre);
+    return wrapper;
+  }
+  function updateScrollable(wrapper) {
+    if (!wrapper || !wrapper.classList || !wrapper.classList.contains('code-wrapper')) return;
+    var pre = wrapper.querySelector('pre');
+    if (!pre) return;
+    if (pre.scrollWidth > pre.clientWidth) {
+      wrapper.classList.add('scrollable');
+    } else {
+      wrapper.classList.remove('scrollable');
+    }
+  }
   var pres = document.querySelectorAll('pre.astro-code, pre.shiki');
   for (var i = 0; i < pres.length; i++) {
     var pre = pres[i];
@@ -457,11 +474,30 @@ function buildHtml(
     code.className = 'language-' + lang;
     code.textContent = rawText;
     addLangBadge(pre, lang);
+    var wrapper = wrapCode(pre);
+    updateScrollable(wrapper);
+    pre.addEventListener('scroll', function() {
+      var w = this.parentNode;
+      if (!w || !w.classList.contains('code-wrapper')) return;
+      if (this.scrollLeft + this.clientWidth >= this.scrollWidth - 4) {
+        w.classList.remove('scrollable');
+      } else if (this.scrollWidth > this.clientWidth) {
+        w.classList.add('scrollable');
+      }
+    }, { passive: true });
   }
+  window.addEventListener('resize', function() {
+    var wrappers = document.querySelectorAll('.code-wrapper');
+    for (var w = 0; w < wrappers.length; w++) {
+      updateScrollable(wrappers[w]);
+    }
+  }, { passive: true });
   if (window.Prism) {
     window.Prism.hooks.add('complete', function(env) {
       if (env.element && env.element.parentNode && env.element.parentNode.tagName === 'PRE') {
-        addLangBadge(env.element.parentNode, env.language);
+        var pre = env.element.parentNode;
+        addLangBadge(pre, env.language);
+        updateScrollable(pre.parentNode);
       }
     });
     if (window.Prism.plugins && window.Prism.plugins.autoloader) {
@@ -518,6 +554,27 @@ function buildHtml(
       margin-top: 0.4em;
     }
     /* Prism overrides — palette-matched backgrounds, keep Prism token colors */
+    .code-wrapper {
+      position: relative;
+      margin: 1.4em 0;
+    }
+    .code-wrapper::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: 48px;
+      background: linear-gradient(to right, transparent, ${codeBg});
+      border-radius: 0 10px 10px 0;
+      pointer-events: none;
+      z-index: 1;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    .code-wrapper.scrollable::after {
+      opacity: 1;
+    }
     pre, pre[class*="language-"] {
       position: relative;
       overflow-x: auto;
@@ -525,9 +582,10 @@ function buildHtml(
       background: ${codeBg} !important;
       border-radius: 10px;
       padding: 16px 18px;
-      margin: 1.4em 0;
+      margin: 0;
       font-size: 14px;
       line-height: 1.6;
+      min-height: 3.5em;
     }
     .lang-badge {
       position: absolute;
@@ -546,6 +604,7 @@ function buildHtml(
       user-select: none;
       line-height: 1.4;
       opacity: 0.85;
+      z-index: 2;
     }
     code[class*="language-"], pre[class*="language-"] > code {
       background: transparent !important;
