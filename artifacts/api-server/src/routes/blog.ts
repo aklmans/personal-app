@@ -132,7 +132,10 @@ function loadContentCacheFromDisk(): void {
           Number.isFinite(entry.ts)
         ) {
           if (now - entry.ts < CONTENT_DISK_TTL) {
-            contentCache.set(entry.url, { html: entry.html, ts: entry.ts });
+            // Clamp ts to appear freshly loaded so fetchPostContent serves
+            // from memory immediately after restart (same pattern as post-list
+            // disk cache). A background re-fetch will happen after CONTENT_TTL.
+            contentCache.set(entry.url, { html: entry.html, ts: now });
             loaded++;
           } else {
             fs.unlink(path.join(CONTENT_DISK_CACHE_DIR, file), () => {});
