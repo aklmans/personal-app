@@ -932,6 +932,7 @@ export default function PostDetailScreen() {
     colorTheme, setColorTheme,
   } = useReadingPrefs();
   const [sheetVisible, setSheetVisible] = useState(false);
+  const [resumeBannerPos, setResumeBannerPos] = useState<number | null>(null);
   const { isBookmarked, toggleBookmark } = useBookmarks();
   const { recordVisit } = useHistory();
 
@@ -943,6 +944,7 @@ export default function PostDetailScreen() {
   const scrollSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const restoredKeyRef = useRef<string | null>(null);
   const lastScrollPosRef = useRef<number>(0);
+  const isRestoringRef = useRef(false);
 
   const { data, isLoading, isError } = useGetBlogPost(
     slug ?? "",
@@ -1138,6 +1140,18 @@ export default function PostDetailScreen() {
   );
 
   useEffect(() => {
+    if (!scrollStorageKey || Platform.OS === "web") return;
+    let cancelled = false;
+    setResumeBannerPos(null);
+    loadScrollPos(scrollStorageKey).then((pos) => {
+      if (!cancelled && pos !== null && pos > 0.05 && pos < 0.95) {
+        setResumeBannerPos(pos);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [scrollStorageKey]);
+
+  useEffect(() => {
     const unsubscribe = navigation.addListener("blur", () => {
       if (!scrollStorageKey) return;
       const p = lastScrollPosRef.current;
@@ -1207,11 +1221,31 @@ export default function PostDetailScreen() {
               }, 500);
             }
           }
+          setResumeBannerPos((prev) => {
+            if (prev !== null && !isRestoringRef.current && msg.p > prev + 0.02) return null;
+            return prev;
+          });
         }
       } catch {}
     },
     [progressAnim, scrollStorageKey]
   );
+
+  const injectScrollToPos = useCallback((position: number, delay = 0) => {
+    if (!webViewRef.current) return;
+    isRestoringRef.current = true;
+    const script = delay > 0
+      ? `setTimeout(function(){var p=${position};var el=document.documentElement;var total=(el.scrollHeight||document.body.scrollHeight)-(el.clientHeight||window.innerHeight);if(total>0){window.scrollTo(0,Math.round(p*total));}},${delay});true;`
+      : `(function(){var p=${position};var el=document.documentElement;var total=(el.scrollHeight||document.body.scrollHeight)-(el.clientHeight||window.innerHeight);if(total>0){window.scrollTo(0,Math.round(p*total));}})();true;`;
+    webViewRef.current.injectJavaScript(script);
+    setTimeout(() => { isRestoringRef.current = false; }, delay + 1200);
+  }, []);
+
+  const handleResumeTap = useCallback(() => {
+    if (Platform.OS === "web" || !webViewRef.current || resumeBannerPos === null) return;
+    injectScrollToPos(resumeBannerPos);
+    setResumeBannerPos(null);
+  }, [resumeBannerPos, injectScrollToPos]);
 
   const restoreScrollPosition = useCallback(async () => {
     if (Platform.OS === "web" || !webViewRef.current || !scrollStorageKey) return;
@@ -1219,10 +1253,8 @@ export default function PostDetailScreen() {
     restoredKeyRef.current = scrollStorageKey;
     const position = await loadScrollPos(scrollStorageKey);
     if (position == null || position <= 0.05) return;
-    webViewRef.current.injectJavaScript(
-      `setTimeout(function(){var p=${position};var el=document.documentElement;var total=(el.scrollHeight||document.body.scrollHeight)-(el.clientHeight||window.innerHeight);if(total>0){window.scrollTo(0,Math.round(p*total));}},400);true;`
-    );
-  }, [scrollStorageKey]);
+    injectScrollToPos(position, 400);
+  }, [scrollStorageKey, injectScrollToPos]);
 
   const openInBrowser = async () => {
     if (!post?.link) return;
@@ -1396,6 +1428,36 @@ export default function PostDetailScreen() {
         </View>
       )}
 
+      {resumeBannerPos !== null && Platform.OS !== "web" && (
+        <View
+          style={[
+            styles.resumeBanner,
+            { backgroundColor: colors.primary, marginHorizontal: 16, marginBottom: 8 },
+          ]}
+        >
+          <Pressable
+            onPress={handleResumeTap}
+            accessibilityRole="button"
+            accessibilityLabel={isZh ? "从上次阅读处继续" : "Resume from where you left off"}
+            style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", flex: 1, opacity: pressed ? 0.75 : 1 })}
+          >
+            <Feather name="bookmark" size={14} color="#ffffff" style={{ marginRight: 6 }} />
+            <Text style={[styles.resumeBannerText, { fontFamily: fonts.sans.semiBold }]}>
+              {isZh ? "从上次阅读处继续" : "Resume from where you left off"}
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setResumeBannerPos(null)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityRole="button"
+            accessibilityLabel={isZh ? "关闭" : "Dismiss"}
+            style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, marginLeft: 8 })}
+          >
+            <Feather name="x" size={14} color="rgba(255,255,255,0.8)" />
+          </Pressable>
+        </View>
+      )}
+
       <View
         style={[
           styles.footer,
@@ -1499,4 +1561,16 @@ const styles = StyleSheet.create({
   },
   openBtnText: { color: "#ffffff", fontSize: 15 },
   errorText: { fontSize: 16, marginTop: 8 },
+  resumeBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 10,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+  },
+  resumeBannerText: {
+    flex: 1,
+    color: "#ffffff",
+    fontSize: 13,
+  },
 });
