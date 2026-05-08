@@ -456,6 +456,7 @@ function buildHtml(
     pre.className = 'language-' + lang;
     code.className = 'language-' + lang;
     code.textContent = rawText;
+    addLangBadge(pre, lang);
   }
   if (window.Prism) {
     window.Prism.hooks.add('complete', function(env) {
@@ -531,15 +532,20 @@ function buildHtml(
     .lang-badge {
       position: absolute;
       top: 8px;
-      right: 12px;
+      right: 10px;
       font-family: 'Inter', system-ui, sans-serif;
-      font-size: 11px;
+      font-size: 10px;
       color: ${muted};
+      background: ${bg};
+      border: 1px solid ${border};
+      border-radius: 4px;
+      padding: 2px 6px;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       pointer-events: none;
       user-select: none;
-      line-height: 1;
+      line-height: 1.4;
+      opacity: 0.85;
     }
     code[class*="language-"], pre[class*="language-"] > code {
       background: transparent !important;
