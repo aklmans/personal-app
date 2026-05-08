@@ -26,6 +26,8 @@ import type {
   SearchBlogPostsParams,
 } from "./api.schemas";
 
+type PartialUseQueryOptions<TData, TError, TData2 = TData, TKey extends readonly unknown[] = readonly unknown[]> = Omit<UseQueryOptions<TData, TError, TData2, TKey>, "queryKey"> & { queryKey?: UseQueryOptions<TData, TError, TData2, TKey>["queryKey"] };
+
 import { customFetch } from "../custom-fetch";
 import type { ErrorType } from "../custom-fetch";
 
@@ -60,7 +62,7 @@ export const getHealthCheckQueryOptions = <
   TData = Awaited<ReturnType<typeof healthCheck>>,
   TError = ErrorType<unknown>,
 >(options?: {
-  query?: UseQueryOptions<
+  query?: PartialUseQueryOptions<
     Awaited<ReturnType<typeof healthCheck>>,
     TError,
     TData
@@ -95,7 +97,7 @@ export function useHealthCheck<
   TData = Awaited<ReturnType<typeof healthCheck>>,
   TError = ErrorType<unknown>,
 >(options?: {
-  query?: UseQueryOptions<
+  query?: PartialUseQueryOptions<
     Awaited<ReturnType<typeof healthCheck>>,
     TError,
     TData
@@ -151,7 +153,7 @@ export const getListBlogPostsQueryOptions = <
 >(
   params?: ListBlogPostsParams,
   options?: {
-    query?: UseQueryOptions<
+    query?: PartialUseQueryOptions<
       Awaited<ReturnType<typeof listBlogPosts>>,
       TError,
       TData
@@ -189,7 +191,7 @@ export function useListBlogPosts<
 >(
   params?: ListBlogPostsParams,
   options?: {
-    query?: UseQueryOptions<
+    query?: PartialUseQueryOptions<
       Awaited<ReturnType<typeof listBlogPosts>>,
       TError,
       TData
@@ -250,7 +252,7 @@ export const getGetBlogPostQueryOptions = <
   slug: string,
   params?: GetBlogPostParams,
   options?: {
-    query?: UseQueryOptions<
+    query?: PartialUseQueryOptions<
       Awaited<ReturnType<typeof getBlogPost>>,
       TError,
       TData
@@ -295,7 +297,7 @@ export function useGetBlogPost<
   slug: string,
   params?: GetBlogPostParams,
   options?: {
-    query?: UseQueryOptions<
+    query?: PartialUseQueryOptions<
       Awaited<ReturnType<typeof getBlogPost>>,
       TError,
       TData
@@ -353,7 +355,7 @@ export const getListBlogCategoriesQueryOptions = <
 >(
   params?: ListBlogCategoriesParams,
   options?: {
-    query?: UseQueryOptions<
+    query?: PartialUseQueryOptions<
       Awaited<ReturnType<typeof listBlogCategories>>,
       TError,
       TData
@@ -392,7 +394,7 @@ export function useListBlogCategories<
 >(
   params?: ListBlogCategoriesParams,
   options?: {
-    query?: UseQueryOptions<
+    query?: PartialUseQueryOptions<
       Awaited<ReturnType<typeof listBlogCategories>>,
       TError,
       TData
@@ -448,7 +450,7 @@ export const getListBlogTagsQueryOptions = <
 >(
   params?: ListBlogTagsParams,
   options?: {
-    query?: UseQueryOptions<
+    query?: PartialUseQueryOptions<
       Awaited<ReturnType<typeof listBlogTags>>,
       TError,
       TData
@@ -486,7 +488,7 @@ export function useListBlogTags<
 >(
   params?: ListBlogTagsParams,
   options?: {
-    query?: UseQueryOptions<
+    query?: PartialUseQueryOptions<
       Awaited<ReturnType<typeof listBlogTags>>,
       TError,
       TData
@@ -542,7 +544,7 @@ export const getListBlogSeriesQueryOptions = <
 >(
   params?: ListBlogSeriesParams,
   options?: {
-    query?: UseQueryOptions<
+    query?: PartialUseQueryOptions<
       Awaited<ReturnType<typeof listBlogSeries>>,
       TError,
       TData
@@ -580,7 +582,7 @@ export function useListBlogSeries<
 >(
   params?: ListBlogSeriesParams,
   options?: {
-    query?: UseQueryOptions<
+    query?: PartialUseQueryOptions<
       Awaited<ReturnType<typeof listBlogSeries>>,
       TError,
       TData
@@ -636,7 +638,7 @@ export const getSearchBlogPostsQueryOptions = <
 >(
   params: SearchBlogPostsParams,
   options?: {
-    query?: UseQueryOptions<
+    query?: PartialUseQueryOptions<
       Awaited<ReturnType<typeof searchBlogPosts>>,
       TError,
       TData
@@ -674,7 +676,7 @@ export function useSearchBlogPosts<
 >(
   params: SearchBlogPostsParams,
   options?: {
-    query?: UseQueryOptions<
+    query?: PartialUseQueryOptions<
       Awaited<ReturnType<typeof searchBlogPosts>>,
       TError,
       TData

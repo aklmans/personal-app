@@ -50,7 +50,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     AsyncStorage.setItem(STORAGE_KEY, pref);
   }, []);
 
-  const resolved = resolve(preference, system);
+  const resolved = resolve(preference, system ?? null);
 
   return (
     <ThemeContext.Provider value={{ preference, resolved, setPreference }}>

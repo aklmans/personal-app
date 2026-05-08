@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import { useListBlogPosts, useListBlogSeries } from "@workspace/api-client-react";
-import type { BlogPost } from "@workspace/api-zod";
+import type { BlogPost } from "@workspace/api-client-react";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import React, { useCallback, useEffect } from "react";
 import {
@@ -109,7 +109,7 @@ export default function SeriesScreen() {
         keyExtractor={(item, i) => (item ? item.slug : `skel-${i}`)}
         renderItem={({ item }) =>
           item ? (
-            <PostCard post={item} onPress={handlePostPress} />
+            <PostCard post={item} onPress={() => handlePostPress(item)} />
           ) : (
             <SkeletonCard />
           )
