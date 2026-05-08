@@ -168,6 +168,42 @@ function buildHtml(
   const codeBg = isDark ? "#2e2825" : "#ede8e0";
   const border = colors.border;
 
+  const prismCssUrl = isDark
+    ? "https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css"
+    : "https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism.min.css";
+
+  const highlightScript = `(function() {
+  var pres = document.querySelectorAll('pre.astro-code, pre.shiki');
+  for (var i = 0; i < pres.length; i++) {
+    var pre = pres[i];
+    var lang = pre.getAttribute('data-language') || 'text';
+    var code = pre.querySelector('code');
+    if (!code) continue;
+    var lineEls = code.querySelectorAll('.line');
+    var rawText;
+    if (lineEls.length > 0) {
+      var parts = [];
+      for (var j = 0; j < lineEls.length; j++) {
+        parts.push(lineEls[j].textContent || '');
+      }
+      rawText = parts.join('\n').replace(/\n$/, '');
+    } else {
+      rawText = (code.textContent || '').replace(/^\n/, '').replace(/\n$/, '');
+    }
+    pre.removeAttribute('style');
+    pre.className = 'language-' + lang;
+    code.className = 'language-' + lang;
+    code.textContent = rawText;
+  }
+  if (window.Prism) {
+    if (window.Prism.plugins && window.Prism.plugins.autoloader) {
+      window.Prism.plugins.autoloader.languages_path =
+        'https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/';
+    }
+    window.Prism.highlightAll();
+  }
+})();`;
+
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -176,6 +212,7 @@ function buildHtml(
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
   <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="${prismCssUrl}">
   <style>
     * { box-sizing: border-box; }
     html { font-size: ${fontSize}px; -webkit-text-size-adjust: 100%; }
@@ -212,15 +249,21 @@ function buildHtml(
       text-align: center;
       margin-top: 0.4em;
     }
-    pre {
+    /* Prism overrides — palette-matched backgrounds, keep Prism token colors */
+    pre, pre[class*="language-"] {
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
-      background: ${codeBg};
+      background: ${codeBg} !important;
       border-radius: 10px;
       padding: 16px 18px;
       margin: 1.4em 0;
       font-size: 14px;
       line-height: 1.6;
+    }
+    code[class*="language-"], pre[class*="language-"] > code {
+      background: transparent !important;
+      font-family: 'Menlo', 'SF Mono', 'Courier New', monospace;
+      font-size: 14px;
     }
     code {
       font-family: 'Menlo', 'SF Mono', 'Courier New', monospace;
@@ -268,17 +311,17 @@ function buildHtml(
     th { background: ${codeBg}; font-weight: 600; }
     ul, ol { padding-left: 1.7em; margin: 0.8em 0 1.25em; }
     li { margin-bottom: 0.45em; }
-    .astro-code, .shiki {
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-    }
     strong { font-weight: 700; }
     em { font-style: italic; }
     mark { background: rgba(218,119,86,0.18); padding: 1px 3px; border-radius: 3px; }
     sup, sub { font-size: 0.75em; }
   </style>
 </head>
-<body>${content || "<p>No content available for this article. Tap the button below to read it in full.</p>"}</body>
+<body>${content || "<p>No content available for this article. Tap the button below to read it in full.</p>"}
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js" data-manual></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+<script>${highlightScript}</script>
+</body>
 </html>`;
 }
 
