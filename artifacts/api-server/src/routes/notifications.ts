@@ -175,8 +175,7 @@ async function sendExpoPushNotifications(messages: object[]): Promise<void> {
           body.data.forEach((result, i) => {
             if (
               result.status === "error" &&
-              (result.details?.error === "DeviceNotRegistered" ||
-                result.details?.error === "InvalidCredentials")
+              result.details?.error === "DeviceNotRegistered"
             ) {
               const token = tokensInChunk[i];
               if (token && registeredTokens.has(token)) {

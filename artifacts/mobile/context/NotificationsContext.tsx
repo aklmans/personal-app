@@ -122,11 +122,11 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
             ])
               .then(async ([storedToken, currentToken]) => {
                 if (!currentToken) return;
-                if (storedToken && storedToken !== currentToken) {
+                const registered = await registerToken(currentToken);
+                if (registered && storedToken && storedToken !== currentToken) {
                   await unregisterToken(storedToken);
                   await AsyncStorage.setItem(STORAGE_TOKEN_KEY, currentToken);
                 }
-                await registerToken(currentToken);
               })
               .catch(() => {});
           }
