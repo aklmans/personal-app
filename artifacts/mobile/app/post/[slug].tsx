@@ -158,7 +158,8 @@ true;`;
 function buildHtml(
   content: string,
   colors: ReturnType<typeof useColors>,
-  isDark: boolean
+  isDark: boolean,
+  fontSize = 17
 ): string {
   const bg = colors.background;
   const text = colors.text;
@@ -177,7 +178,7 @@ function buildHtml(
   <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500&display=swap" rel="stylesheet">
   <style>
     * { box-sizing: border-box; }
-    html { font-size: 17px; -webkit-text-size-adjust: 100%; }
+    html { font-size: ${fontSize}px; -webkit-text-size-adjust: 100%; }
     body {
       margin: 0; padding: 0 20px 48px;
       background-color: ${bg};
@@ -358,6 +359,11 @@ export default function PostDetailScreen() {
     [post, colors, isDark]
   );
 
+  const webHtmlContent = useMemo(
+    () => (post ? buildHtml(post.content ?? "", colors, isDark, fontSize) : ""),
+    [post, colors, isDark, fontSize]
+  );
+
   const onWebViewMessage = useCallback(
     (event: { nativeEvent: { data: string } }) => {
       try {
@@ -412,7 +418,7 @@ export default function PostDetailScreen() {
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       {Platform.OS === "web" ? (
         <iframe
-          srcDoc={htmlContent}
+          srcDoc={webHtmlContent}
           style={{
             flex: 1,
             border: "none",

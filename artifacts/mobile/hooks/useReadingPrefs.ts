@@ -28,6 +28,9 @@ export function useReadingPrefs(): ReadingPrefs {
         }
       }
     });
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
   }, []);
 
   const update = useCallback((next: number) => {
