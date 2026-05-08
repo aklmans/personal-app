@@ -1,3 +1,5 @@
+import { readFile, writeFile, mkdir } from "fs/promises";
+import { resolve, dirname } from "path";
 import { Router } from "express";
 import { XMLParser } from "fast-xml-parser";
 import { logger } from "../lib/logger";
@@ -53,6 +55,12 @@ const SITEMAP_CACHE_TTL = 10 * 60 * 1000;
 let _sitemapCache: { urls: string[]; ts: number } | null = null;
 
 const SCRAPE_CONCURRENCY = 5;
+
+const METADATA_DISK_CACHE_FILE = resolve(process.cwd(), ".cache", "metadata.json");
+const METADATA_DISK_TTL = 7 * 24 * 60 * 60 * 1000;
+
+type DiskMetadataEntry = { post: BlogPost; savedAt: number };
+const _diskMetaCache = new Map<string, DiskMetadataEntry>();
 
 async function withConcurrencyLimit<T>(
   tasks: (() => Promise<T>)[],
@@ -274,6 +282,49 @@ function filterSitemapUrlsByLocale(urls: string[], locale: string): string[] {
   return urls.filter((u) => !u.includes(`${SITE_BASE}/zh-cn/`));
 }
 
+async function loadMetadataDiskCache(): Promise<void> {
+  try {
+    const raw = await readFile(METADATA_DISK_CACHE_FILE, "utf8");
+    const parsed = JSON.parse(raw) as Record<string, DiskMetadataEntry>;
+    const now = Date.now();
+    let loaded = 0;
+    for (const [url, entry] of Object.entries(parsed)) {
+      if (now - entry.savedAt < METADATA_DISK_TTL) {
+        _diskMetaCache.set(url, entry);
+        loaded++;
+      }
+    }
+    logger.info({ loaded }, "blog: metadata disk cache loaded");
+  } catch {
+    // File missing or corrupt — start fresh, not an error
+  }
+}
+
+function getMetadataFromDiskCache(url: string): BlogPost | null {
+  const key = url.replace(/\/+$/, "");
+  const entry = _diskMetaCache.get(key) ?? _diskMetaCache.get(key + "/");
+  if (!entry) return null;
+  if (Date.now() - entry.savedAt > METADATA_DISK_TTL) {
+    _diskMetaCache.delete(key);
+    _diskMetaCache.delete(key + "/");
+    return null;
+  }
+  return entry.post;
+}
+
+async function flushMetadataDiskCache(): Promise<void> {
+  try {
+    await mkdir(dirname(METADATA_DISK_CACHE_FILE), { recursive: true });
+    const obj: Record<string, DiskMetadataEntry> = {};
+    for (const [url, entry] of _diskMetaCache.entries()) {
+      obj[url] = entry;
+    }
+    await writeFile(METADATA_DISK_CACHE_FILE, JSON.stringify(obj), "utf8");
+  } catch (err) {
+    logger.warn({ err }, "blog: failed to flush metadata disk cache");
+  }
+}
+
 async function doFetchFeed(locale: string): Promise<BlogPost[]> {
   const t0 = Date.now();
   const url = RSS_FEEDS[locale] ?? RSS_FEEDS["en"]!;
@@ -352,24 +403,48 @@ async function doFetchFeed(locale: string): Promise<BlogPost[]> {
 
   let sitemapPosts: BlogPost[] = [];
   let sitemapScrapeCount = 0;
+  let sitemapFromDisk = 0;
   try {
     const sitemapUrls = await fetchSitemapPostUrls(locale);
     const newUrls = sitemapUrls.filter(
       (u) => !rssPostLinks.has(u.replace(/\/+$/, ""))
     );
-    sitemapScrapeCount = newUrls.length;
 
     if (newUrls.length > 0) {
-      const results = await withConcurrencyLimit(
-        newUrls.map((u) => () => fetchPostMetadataFromPage(u, locale)),
-        SCRAPE_CONCURRENCY
-      );
-      sitemapPosts = results
-        .filter(
-          (r): r is PromiseFulfilledResult<BlogPost> =>
-            r.status === "fulfilled" && r.value !== null
-        )
-        .map((r) => r.value);
+      const fromDisk: BlogPost[] = [];
+      const toFetch: string[] = [];
+      for (const u of newUrls) {
+        const cached = getMetadataFromDiskCache(u);
+        if (cached) {
+          fromDisk.push(cached);
+        } else {
+          toFetch.push(u);
+        }
+      }
+      sitemapFromDisk = fromDisk.length;
+      sitemapScrapeCount = toFetch.length;
+
+      let freshPosts: BlogPost[] = [];
+      if (toFetch.length > 0) {
+        const results = await withConcurrencyLimit(
+          toFetch.map((u) => () => fetchPostMetadataFromPage(u, locale)),
+          SCRAPE_CONCURRENCY
+        );
+        freshPosts = results
+          .filter(
+            (r): r is PromiseFulfilledResult<BlogPost> =>
+              r.status === "fulfilled" && r.value !== null
+          )
+          .map((r) => r.value);
+
+        const savedAt = Date.now();
+        for (const post of freshPosts) {
+          _diskMetaCache.set(post.link.replace(/\/+$/, ""), { post, savedAt });
+        }
+        flushMetadataDiskCache().catch(() => {});
+      }
+
+      sitemapPosts = [...fromDisk, ...freshPosts];
     }
   } catch (err) {
     logger.warn({ locale, err }, "blog: sitemap scraping failed");
@@ -389,6 +464,7 @@ async function doFetchFeed(locale: string): Promise<BlogPost[]> {
     {
       locale,
       rssCount: rssPosts.length,
+      sitemapFromDisk,
       sitemapScrapeCount,
       sitemapFound: sitemapPosts.length,
       totalPosts: posts.length,
@@ -613,6 +689,6 @@ router.get("/search", async (req, res) => {
   }
 });
 
-warmCache();
+loadMetadataDiskCache().then(() => warmCache()).catch(() => warmCache());
 
 export default router;
