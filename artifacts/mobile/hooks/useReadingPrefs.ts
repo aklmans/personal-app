@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 const FONT_SIZE_KEY = "@aklman/reading_font_size";
 const LINE_SPACING_KEY = "@aklman/reading_line_spacing";
 const CONTENT_WIDTH_KEY = "@aklman/reading_content_width";
+const FONT_FAMILY_KEY = "@aklman/reading_font_family";
 
 export const FONT_SIZE_DEFAULT = 17;
 export const FONT_SIZE_MIN = 14;
@@ -17,6 +18,9 @@ export const LINE_SPACING_DEFAULT: LineSpacing = 1.85;
 export type ContentWidth = "full" | "narrow";
 export const CONTENT_WIDTH_DEFAULT: ContentWidth = "full";
 
+export type FontFamily = "serif" | "sans";
+export const FONT_FAMILY_DEFAULT: FontFamily = "serif";
+
 export interface ReadingPrefs {
   fontSize: number;
   canIncrease: boolean;
@@ -27,12 +31,15 @@ export interface ReadingPrefs {
   setLineSpacing: (v: LineSpacing) => void;
   contentWidth: ContentWidth;
   setContentWidth: (v: ContentWidth) => void;
+  fontFamily: FontFamily;
+  setFontFamily: (v: FontFamily) => void;
 }
 
 export function useReadingPrefs(): ReadingPrefs {
   const [fontSize, setFontSize] = useState(FONT_SIZE_DEFAULT);
   const [lineSpacing, setLineSpacingState] = useState<LineSpacing>(LINE_SPACING_DEFAULT);
   const [contentWidth, setContentWidthState] = useState<ContentWidth>(CONTENT_WIDTH_DEFAULT);
+  const [fontFamily, setFontFamilyState] = useState<FontFamily>(FONT_FAMILY_DEFAULT);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -40,7 +47,8 @@ export function useReadingPrefs(): ReadingPrefs {
       AsyncStorage.getItem(FONT_SIZE_KEY),
       AsyncStorage.getItem(LINE_SPACING_KEY),
       AsyncStorage.getItem(CONTENT_WIDTH_KEY),
-    ]).then(([storedSize, storedSpacing, storedWidth]) => {
+      AsyncStorage.getItem(FONT_FAMILY_KEY),
+    ]).then(([storedSize, storedSpacing, storedWidth, storedFamily]) => {
       if (storedSize !== null) {
         const parsed = parseInt(storedSize, 10);
         if (!isNaN(parsed) && parsed >= FONT_SIZE_MIN && parsed <= FONT_SIZE_MAX) {
@@ -55,6 +63,9 @@ export function useReadingPrefs(): ReadingPrefs {
       }
       if (storedWidth === "full" || storedWidth === "narrow") {
         setContentWidthState(storedWidth);
+      }
+      if (storedFamily === "serif" || storedFamily === "sans") {
+        setFontFamilyState(storedFamily);
       }
     });
     return () => {
@@ -81,6 +92,11 @@ export function useReadingPrefs(): ReadingPrefs {
     AsyncStorage.setItem(CONTENT_WIDTH_KEY, v);
   }, []);
 
+  const setFontFamily = useCallback((v: FontFamily) => {
+    setFontFamilyState(v);
+    AsyncStorage.setItem(FONT_FAMILY_KEY, v);
+  }, []);
+
   return {
     fontSize,
     canIncrease: fontSize < FONT_SIZE_MAX,
@@ -91,5 +107,7 @@ export function useReadingPrefs(): ReadingPrefs {
     setLineSpacing,
     contentWidth,
     setContentWidth,
+    fontFamily,
+    setFontFamily,
   };
 }

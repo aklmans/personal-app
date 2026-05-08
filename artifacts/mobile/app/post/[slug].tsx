@@ -29,6 +29,7 @@ import {
   useReadingPrefs,
   type LineSpacing,
   type ContentWidth,
+  type FontFamily,
   LINE_SPACING_PRESETS,
 } from "@/hooks/useReadingPrefs";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -175,6 +176,11 @@ const WIDTH_OPTS: {
   { value: "narrow", label: "Narrow", labelZh: "窄列", icon: "minimize-2" },
 ];
 
+const FONT_FAMILY_OPTS: { value: FontFamily; label: string; labelZh: string; sampleFont: string }[] = [
+  { value: "serif", label: "Serif", labelZh: "衬线", sampleFont: "Lora_400Regular" },
+  { value: "sans", label: "Sans", labelZh: "无衬线", sampleFont: "Inter_400Regular" },
+];
+
 function ReadingPrefsSheet({
   visible,
   onClose,
@@ -182,6 +188,8 @@ function ReadingPrefsSheet({
   setLineSpacing,
   contentWidth,
   setContentWidth,
+  fontFamily,
+  setFontFamily,
   isZh,
 }: {
   visible: boolean;
@@ -190,6 +198,8 @@ function ReadingPrefsSheet({
   setLineSpacing: (v: LineSpacing) => void;
   contentWidth: ContentWidth;
   setContentWidth: (v: ContentWidth) => void;
+  fontFamily: FontFamily;
+  setFontFamily: (v: FontFamily) => void;
   isZh: boolean;
 }) {
   const colors = useColors();
@@ -327,6 +337,52 @@ function ReadingPrefsSheet({
             );
           })}
         </View>
+
+        <Text
+          style={[
+            sheetStyles.sectionLabel,
+            {
+              color: colors.mutedForeground,
+              fontFamily: fonts.sans.semiBold,
+              marginTop: 18,
+            },
+          ]}
+        >
+          {isZh ? "字体风格" : "FONT STYLE"}
+        </Text>
+        <View style={sheetStyles.optRow}>
+          {FONT_FAMILY_OPTS.map((opt) => {
+            const active = fontFamily === opt.value;
+            return (
+              <Pressable
+                key={opt.value}
+                onPress={() => setFontFamily(opt.value)}
+                style={({ pressed }) => [
+                  sheetStyles.optBtn,
+                  {
+                    backgroundColor: active ? colors.primary : colors.secondary,
+                    borderColor: active ? colors.primary : colors.border,
+                    opacity: pressed ? 0.72 : 1,
+                  },
+                ]}
+                accessibilityLabel={opt.label}
+                accessibilityRole="button"
+              >
+                <Text
+                  style={[
+                    sheetStyles.optLabel,
+                    {
+                      color: active ? "#fff" : colors.text,
+                      fontFamily: opt.sampleFont,
+                    },
+                  ]}
+                >
+                  {isZh ? opt.labelZh : opt.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
     </Modal>
   );
@@ -400,10 +456,14 @@ interface PostWithContent {
 function buildInjectedJS(
   fontSize: number,
   lineSpacing: number,
-  contentWidth: ContentWidth
+  contentWidth: ContentWidth,
+  fontFamily: FontFamily
 ): string {
   const maxW = contentWidth === "narrow" ? "680px" : "100%";
   const padH = contentWidth === "narrow" ? "24px" : "20px";
+  const fontStack = fontFamily === "sans"
+    ? "'Inter', system-ui, sans-serif"
+    : "'Lora', Georgia, 'Times New Roman', serif";
   return `(function() {
   document.documentElement.style.setProperty('font-size', '${fontSize}px', 'important');
   document.body.style.lineHeight = '${lineSpacing}';
@@ -412,6 +472,7 @@ function buildInjectedJS(
   document.body.style.paddingRight = '${padH}';
   document.body.style.marginLeft = 'auto';
   document.body.style.marginRight = 'auto';
+  document.body.style.fontFamily = '${fontStack}';
   function send() {
     var el = document.documentElement;
     var top = el.scrollTop || document.body.scrollTop || 0;
@@ -434,7 +495,8 @@ function buildHtml(
   isDark: boolean,
   fontSize = 17,
   lineSpacing = 1.85,
-  contentWidth: ContentWidth = "full"
+  contentWidth: ContentWidth = "full",
+  fontFamily: FontFamily = "serif"
 ): string {
   const bg = colors.background;
   const text = colors.text;
@@ -557,14 +619,14 @@ function buildHtml(
       margin: 0 auto; padding: 0 ${padH} 48px;
       background-color: ${bg};
       color: ${text};
-      font-family: 'Lora', Georgia, 'Times New Roman', serif;
+      font-family: ${fontFamily === "sans" ? "'Inter', system-ui, sans-serif" : "'Lora', Georgia, 'Times New Roman', serif"};
       line-height: ${lineSpacing};
       max-width: ${bodyMaxWidth};
       word-wrap: break-word;
       overflow-x: hidden;
     }
     h1, h2, h3, h4, h5, h6 {
-      font-family: 'Lora', Georgia, serif;
+      font-family: ${fontFamily === "sans" ? "'Inter', system-ui, sans-serif" : "'Lora', Georgia, serif"};
       font-weight: 700;
       color: ${text};
       line-height: 1.3;
@@ -719,6 +781,7 @@ export default function PostDetailScreen() {
   const {
     fontSize, canIncrease, canDecrease, increase, decrease,
     lineSpacing, setLineSpacing, contentWidth, setContentWidth,
+    fontFamily, setFontFamily,
   } = useReadingPrefs();
   const [sheetVisible, setSheetVisible] = useState(false);
   const { isBookmarked, toggleBookmark } = useBookmarks();
@@ -936,6 +999,17 @@ export default function PostDetailScreen() {
     return unsubscribe;
   }, [navigation, scrollStorageKey]);
 
+  useEffect(() => {
+    if (Platform.OS !== "web" && webViewRef.current) {
+      const fontStack = fontFamily === "sans"
+        ? "'Inter', system-ui, sans-serif"
+        : "'Lora', Georgia, 'Times New Roman', serif";
+      webViewRef.current.injectJavaScript(
+        `document.body.style.fontFamily='${fontStack}';true;`
+      );
+    }
+  }, [fontFamily]);
+
   const htmlContent = useMemo(
     () => (post ? buildHtml(post.content ?? "", colors, isDark) : ""),
     [post, colors, isDark]
@@ -944,9 +1018,9 @@ export default function PostDetailScreen() {
   const webHtmlContent = useMemo(
     () =>
       post
-        ? buildHtml(post.content ?? "", colors, isDark, fontSize, lineSpacing, contentWidth)
+        ? buildHtml(post.content ?? "", colors, isDark, fontSize, lineSpacing, contentWidth, fontFamily)
         : "",
-    [post, colors, isDark, fontSize, lineSpacing, contentWidth]
+    [post, colors, isDark, fontSize, lineSpacing, contentWidth, fontFamily]
   );
 
   const scrollStorageKey = useMemo(
@@ -1052,7 +1126,7 @@ export default function PostDetailScreen() {
           javaScriptEnabled
           domStorageEnabled={false}
           allowsInlineMediaPlayback={false}
-          injectedJavaScript={buildInjectedJS(fontSize, lineSpacing, contentWidth)}
+          injectedJavaScript={buildInjectedJS(fontSize, lineSpacing, contentWidth, fontFamily)}
           onMessage={onWebViewMessage}
           onLoadEnd={() => { restoreScrollPosition(); }}
         />
@@ -1190,6 +1264,8 @@ export default function PostDetailScreen() {
         setLineSpacing={setLineSpacing}
         contentWidth={contentWidth}
         setContentWidth={setContentWidth}
+        fontFamily={fontFamily}
+        setFontFamily={setFontFamily}
         isZh={isZh}
       />
     </View>
