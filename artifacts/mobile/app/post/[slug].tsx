@@ -436,6 +436,7 @@ function buildHtml(
     pre.appendChild(badge);
   }
   function wrapCode(pre) {
+    if (!pre.parentNode || pre.parentNode.classList && pre.parentNode.classList.contains('code-wrapper')) return pre.parentNode;
     var wrapper = document.createElement('div');
     wrapper.className = 'code-wrapper';
     pre.parentNode.insertBefore(wrapper, pre);
@@ -497,7 +498,8 @@ function buildHtml(
       if (env.element && env.element.parentNode && env.element.parentNode.tagName === 'PRE') {
         var pre = env.element.parentNode;
         addLangBadge(pre, env.language);
-        updateScrollable(pre.parentNode);
+        var wrapper = wrapCode(pre);
+        updateScrollable(wrapper);
       }
     });
     if (window.Prism.plugins && window.Prism.plugins.autoloader) {
