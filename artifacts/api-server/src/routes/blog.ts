@@ -79,9 +79,12 @@ function slugify(str: string): string {
 }
 
 function extractSlugFromUrl(url: string): string {
-  // Use first path segment after /posts/ as slug (series path)
-  const match = url.match(/\/posts\/([^/?#]+)/);
-  return match ? match[1] : slugify(url);
+  // Use the last non-empty path segment as the unique post slug.
+  // For /posts/{seriesSlug}/{postSlug}/ this gives "postSlug".
+  // For /posts/{postSlug}/ this gives "postSlug".
+  const clean = url.split("?")[0]!.split("#")[0]!.replace(/\/+$/, "");
+  const lastSegment = clean.split("/").filter(Boolean).pop();
+  return lastSegment ?? slugify(url);
 }
 
 function extractSeriesFromUrl(url: string): { seriesSlug: string | null; seriesName: string | null } {
