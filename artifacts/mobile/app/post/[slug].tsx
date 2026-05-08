@@ -427,6 +427,14 @@ function buildHtml(
     if (m) return m[1];
     return 'text';
   }
+  function addLangBadge(pre, lang) {
+    if (!lang || lang === 'text' || lang === 'plaintext' || lang === 'none') return;
+    if (pre.querySelector('.lang-badge')) return;
+    var badge = document.createElement('span');
+    badge.className = 'lang-badge';
+    badge.textContent = lang;
+    pre.appendChild(badge);
+  }
   var pres = document.querySelectorAll('pre.astro-code, pre.shiki');
   for (var i = 0; i < pres.length; i++) {
     var pre = pres[i];
@@ -450,6 +458,11 @@ function buildHtml(
     code.textContent = rawText;
   }
   if (window.Prism) {
+    window.Prism.hooks.add('complete', function(env) {
+      if (env.element && env.element.parentNode && env.element.parentNode.tagName === 'PRE') {
+        addLangBadge(env.element.parentNode, env.language);
+      }
+    });
     if (window.Prism.plugins && window.Prism.plugins.autoloader) {
       window.Prism.plugins.autoloader.languages_path =
         'https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/';
@@ -505,6 +518,7 @@ function buildHtml(
     }
     /* Prism overrides — palette-matched backgrounds, keep Prism token colors */
     pre, pre[class*="language-"] {
+      position: relative;
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
       background: ${codeBg} !important;
@@ -513,6 +527,19 @@ function buildHtml(
       margin: 1.4em 0;
       font-size: 14px;
       line-height: 1.6;
+    }
+    .lang-badge {
+      position: absolute;
+      top: 8px;
+      right: 12px;
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 11px;
+      color: ${muted};
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      pointer-events: none;
+      user-select: none;
+      line-height: 1;
     }
     code[class*="language-"], pre[class*="language-"] > code {
       background: transparent !important;
