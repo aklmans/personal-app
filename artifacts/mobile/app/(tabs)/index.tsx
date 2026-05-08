@@ -1,7 +1,7 @@
-import { useListBlogPosts } from "@workspace/api-client-react";
 import { useRouter } from "expo-router";
 import React, { useCallback } from "react";
 import {
+  ActivityIndicator,
   FlatList,
   Platform,
   Pressable,
@@ -18,6 +18,7 @@ import { PostCard } from "@/components/PostCard";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { fonts } from "@/constants/fonts";
 import { useLanguage } from "@/context/LanguageContext";
+import { usePaginatedPosts } from "@/hooks/usePaginatedPosts";
 import { useColors } from "@/hooks/useColors";
 
 export default function HomeScreen() {
@@ -26,10 +27,19 @@ export default function HomeScreen() {
   const { locale, toggleLocale, isZh } = useLanguage();
   const insets = useSafeAreaInsets();
 
-  const { data: posts, isLoading, refetch, isRefetching } = useListBlogPosts(
-    { locale },
-    { query: { refetchOnWindowFocus: false } }
-  );
+  const {
+    data,
+    isLoading,
+    refetch,
+    isRefetching,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = usePaginatedPosts({ locale, limit: 10 });
+
+  const allPosts = data?.pages.flatMap((p) => p.posts) ?? [];
+  const hero = allPosts[0] as PostData | undefined;
+  const recent = allPosts.slice(1) as PostData[];
 
   const handlePostPress = useCallback(
     (post: PostData) => {
@@ -41,8 +51,11 @@ export default function HomeScreen() {
   const topPad =
     Platform.OS === "web" ? Math.max(insets.top, 67) : insets.top;
 
-  const hero = posts?.[0];
-  const recent = posts?.slice(1) ?? [];
+  const handleEndReached = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const renderItem = useCallback(
     ({ item }: { item: PostData }) => (
@@ -94,7 +107,7 @@ export default function HomeScreen() {
         </View>
       ) : hero ? (
         <View style={styles.content}>
-          <HeroPost post={hero as PostData} onPress={() => handlePostPress(hero as PostData)} />
+          <HeroPost post={hero} onPress={() => handlePostPress(hero)} />
           <Text
             style={[
               styles.sectionTitle,
@@ -108,19 +121,28 @@ export default function HomeScreen() {
     </View>
   );
 
+  const ListFooter = isFetchingNextPage ? (
+    <View style={styles.footerLoader}>
+      <ActivityIndicator size="small" color={colors.primary} />
+    </View>
+  ) : null;
+
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <FlatList
-        data={recent as PostData[]}
+        data={recent}
         keyExtractor={(item) => item.slug}
         renderItem={renderItem}
         ListHeaderComponent={ListHeader}
+        ListFooterComponent={ListFooter}
         contentContainerStyle={[
           styles.listContent,
           { paddingBottom: insets.bottom + 16 + (Platform.OS === "web" ? 34 : 0) },
         ]}
         showsVerticalScrollIndicator={false}
         scrollEnabled={!isLoading}
+        onEndReached={handleEndReached}
+        onEndReachedThreshold={0.4}
         refreshControl={
           <RefreshControl
             refreshing={isRefetching}
@@ -192,5 +214,9 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 15,
+  },
+  footerLoader: {
+    paddingVertical: 20,
+    alignItems: "center",
   },
 });

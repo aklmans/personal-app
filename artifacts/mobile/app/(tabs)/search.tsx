@@ -1,4 +1,4 @@
-import { useSearchBlogPosts } from "@workspace/api-client-react";
+import { useSearchBlogPosts, queryOpts } from "@workspace/api-client-react";
 import { useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
 import {
@@ -28,10 +28,10 @@ export default function SearchScreen() {
   const { data: results, isLoading } = useSearchBlogPosts(
     { q: query, locale },
     {
-      query: {
+      query: queryOpts({
         enabled: query.trim().length > 1,
         refetchOnWindowFocus: false,
-      },
+      }),
     }
   );
 

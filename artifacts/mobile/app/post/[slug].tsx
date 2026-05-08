@@ -1,5 +1,5 @@
 import { Feather } from "@expo/vector-icons";
-import { useGetBlogPost } from "@workspace/api-client-react";
+import { useGetBlogPost, queryOpts } from "@workspace/api-client-react";
 import type { RelatedPost } from "@workspace/api-client-react";
 import * as WebBrowser from "expo-web-browser";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
@@ -304,7 +304,7 @@ export default function PostDetailScreen() {
   const { data, isLoading, isError } = useGetBlogPost(
     slug ?? "",
     { locale: safeLocale },
-    { query: { enabled: !!slug, refetchOnWindowFocus: false } }
+    { query: queryOpts({ enabled: !!slug, refetchOnWindowFocus: false }) }
   );
 
   const post = data as PostWithContent | undefined;

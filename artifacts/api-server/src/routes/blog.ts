@@ -8,6 +8,9 @@ const RSS_FEEDS: Record<string, string> = {
   "zh-cn": "https://aklman.com/zh-cn/rss.xml",
 };
 
+const SITEMAP_INDEX = "https://aklman.com/sitemap-index.xml";
+const SITE_BASE = "https://aklman.com";
+
 interface BlogPost {
   slug: string;
   title: string;
@@ -41,11 +44,13 @@ const CACHE_TTL = 5 * 60 * 1000;
 const contentCache: Map<string, { html: string; ts: number }> = new Map();
 const CONTENT_TTL = 15 * 60 * 1000;
 
+const sitemapCache: { urls: string[]; ts: number } | null = null;
+const SITEMAP_CACHE_TTL = 10 * 60 * 1000;
+let _sitemapCache: { urls: string[]; ts: number } | null = sitemapCache;
+
 function extractArticleHtml(pageHtml: string): string {
-  // Try <article>
   const articleMatch = pageHtml.match(/<article[^>]*>([\s\S]*?)<\/article>/i);
   if (articleMatch) return articleMatch[1];
-  // Fallback: try <main>
   const mainMatch = pageHtml.match(/<main[^>]*>([\s\S]*?)<\/main>/i);
   if (mainMatch) return mainMatch[1];
   return "";
@@ -79,16 +84,12 @@ function slugify(str: string): string {
 }
 
 function extractSlugFromUrl(url: string): string {
-  // Use the last non-empty path segment as the unique post slug.
-  // For /posts/{seriesSlug}/{postSlug}/ this gives "postSlug".
-  // For /posts/{postSlug}/ this gives "postSlug".
   const clean = url.split("?")[0]!.split("#")[0]!.replace(/\/+$/, "");
   const lastSegment = clean.split("/").filter(Boolean).pop();
   return lastSegment ?? slugify(url);
 }
 
 function extractSeriesFromUrl(url: string): { seriesSlug: string | null; seriesName: string | null } {
-  // Pattern: /posts/{seriesSlug}/{postSlug}/
   const match = url.match(/\/posts\/([^/?#]+)\/([^/?#]+)/);
   if (match) {
     const seriesSlug = match[1];
@@ -124,6 +125,126 @@ function getText(val: unknown): string {
   return String(val);
 }
 
+function getMeta(html: string, property: string): string {
+  const re = new RegExp(`<meta[^>]+(?:property|name)="${property}"[^>]+content="([^"]*)"`, "i");
+  const m = html.match(re) ?? html.match(new RegExp(`<meta[^>]+content="([^"]*)"[^>]+(?:property|name)="${property}"`, "i"));
+  return m ? m[1] : "";
+}
+
+function getAllMeta(html: string, property: string): string[] {
+  const re = new RegExp(`<meta[^>]+(?:property|name)="${property}"[^>]+content="([^"]*)"`, "gi");
+  const results: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html)) !== null) {
+    if (m[1]) results.push(m[1]);
+  }
+  if (results.length === 0) {
+    const re2 = new RegExp(`<meta[^>]+content="([^"]*)"[^>]+(?:property|name)="${property}"`, "gi");
+    while ((m = re2.exec(html)) !== null) {
+      if (m[1]) results.push(m[1]);
+    }
+  }
+  return results;
+}
+
+async function fetchPostMetadataFromPage(url: string, locale: string): Promise<BlogPost | null> {
+  try {
+    const res = await fetch(url, {
+      headers: { "User-Agent": "aklman-mobile/1.0" },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return null;
+    const html = await res.text();
+
+    const rawTitle = getMeta(html, "og:title") || getMeta(html, "title") || "";
+    const title = rawTitle.replace(/\s*·\s*Aklman Blog\s*$/i, "").trim();
+    if (!title) return null;
+
+    const description = getMeta(html, "description") || getMeta(html, "og:description") || "";
+    const pubDateRaw = getMeta(html, "article:published_time");
+    const pubDate = pubDateRaw ? new Date(pubDateRaw).toUTCString() : "";
+    const tags = getAllMeta(html, "article:tag");
+    const content = extractArticleHtml(html);
+    const coverImage = extractCoverImage(content) || getMeta(html, "og:image") || null;
+    const readingTime = content ? estimateReadingTime(content) : null;
+
+    const normalizedUrl = url.replace(/\/+$/, "");
+    const slug = extractSlugFromUrl(normalizedUrl);
+    const { seriesSlug, seriesName } = extractSeriesFromUrl(normalizedUrl);
+
+    const linkWithSlash = normalizedUrl + "/";
+
+    return {
+      slug,
+      title,
+      description,
+      pubDate,
+      link: linkWithSlash,
+      coverImage,
+      categories: [],
+      tags,
+      readingTime,
+      locale,
+      content,
+      series: seriesName,
+      seriesSlug,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function fetchSitemapPostUrls(locale: string): Promise<string[]> {
+  const now = Date.now();
+  if (_sitemapCache && now - _sitemapCache.ts < SITEMAP_CACHE_TTL) {
+    return filterSitemapUrlsByLocale(_sitemapCache.urls, locale);
+  }
+
+  try {
+    const indexRes = await fetch(SITEMAP_INDEX, {
+      headers: { "User-Agent": "aklman-mobile/1.0" },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!indexRes.ok) return [];
+
+    const indexXml = await indexRes.text();
+    const sitemapUrls = [...indexXml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1].trim());
+
+    const allPostUrls: string[] = [];
+
+    await Promise.all(
+      sitemapUrls.map(async (sitemapUrl) => {
+        try {
+          const res = await fetch(sitemapUrl, {
+            headers: { "User-Agent": "aklman-mobile/1.0" },
+            signal: AbortSignal.timeout(8000),
+          });
+          if (!res.ok) return;
+          const xml = await res.text();
+          const urls = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)]
+            .map((m) => m[1].trim())
+            .filter((u) => u.match(/\/posts\/[^/]+\/[^/]+\/?$/) || u.match(/\/posts\/[^/]+\/?$/) && !u.endsWith("/posts/"));
+          allPostUrls.push(...urls);
+        } catch {
+          // ignore
+        }
+      })
+    );
+
+    _sitemapCache = { urls: allPostUrls, ts: now };
+    return filterSitemapUrlsByLocale(allPostUrls, locale);
+  } catch {
+    return _sitemapCache ? filterSitemapUrlsByLocale(_sitemapCache.urls, locale) : [];
+  }
+}
+
+function filterSitemapUrlsByLocale(urls: string[], locale: string): string[] {
+  if (locale === "zh-cn") {
+    return urls.filter((u) => u.includes(`${SITE_BASE}/zh-cn/`));
+  }
+  return urls.filter((u) => !u.includes(`${SITE_BASE}/zh-cn/`));
+}
+
 async function fetchFeed(locale: string): Promise<BlogPost[]> {
   const now = Date.now();
   const entry = cache[locale];
@@ -133,85 +254,120 @@ async function fetchFeed(locale: string): Promise<BlogPost[]> {
 
   const url = RSS_FEEDS[locale] ?? RSS_FEEDS["en"];
 
+  let rssPosts: BlogPost[] = [];
+
   try {
     const res = await fetch(url, {
       headers: { "User-Agent": "aklman-mobile/1.0" },
       signal: AbortSignal.timeout(10000),
     });
 
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (res.ok) {
+      const xml = await res.text();
 
-    const xml = await res.text();
+      const parser = new XMLParser({
+        ignoreAttributes: false,
+        attributeNamePrefix: "@_",
+        cdataPropName: "__cdata",
+        isArray: (name) => name === "item" || name === "category",
+      });
 
-    const parser = new XMLParser({
-      ignoreAttributes: false,
-      attributeNamePrefix: "@_",
-      cdataPropName: "__cdata",
-      isArray: (name) => name === "item" || name === "category",
-    });
+      const parsed = parser.parse(xml) as Record<string, unknown>;
+      const rss = parsed["rss"] as Record<string, unknown> | undefined;
+      const channel = rss?.["channel"] as Record<string, unknown> | undefined;
 
-    const parsed = parser.parse(xml) as Record<string, unknown>;
-    const rss = parsed["rss"] as Record<string, unknown> | undefined;
-    const channel = rss?.["channel"] as Record<string, unknown> | undefined;
+      if (channel) {
+        const items = (channel["item"] as unknown[]) ?? [];
 
-    if (!channel) throw new Error("Invalid RSS feed structure");
+        rssPosts = items.map((raw) => {
+          const item = raw as Record<string, unknown>;
+          const title = getText(item["title"]);
+          const link = getText(item["link"]);
+          const description = getText(item["description"]);
+          const pubDate = getText(item["pubDate"]);
+          const content = getText(item["content:encoded"]);
 
-    const items = (channel["item"] as unknown[]) ?? [];
+          const rawCats = item["category"] as unknown[] | undefined;
+          const allCats: string[] = rawCats
+            ? rawCats.map((c) => getText(c)).filter(Boolean)
+            : [];
 
-    const posts: BlogPost[] = items.map((raw) => {
-      const item = raw as Record<string, unknown>;
-      const title = getText(item["title"]);
-      const link = getText(item["link"]);
-      const description = getText(item["description"]);
-      const pubDate = getText(item["pubDate"]);
-      const content = getText(item["content:encoded"]);
+          const categories: string[] = allCats.slice(0, 1);
+          const tags: string[] = allCats.length > 1 ? allCats.slice(1) : allCats;
 
-      const rawCats = item["category"] as unknown[] | undefined;
-      const allCats: string[] = rawCats
-        ? rawCats.map((c) => getText(c)).filter(Boolean)
-        : [];
+          const slug = extractSlugFromUrl(link);
+          const coverImage = extractCoverImage(content);
+          const readingTime = content ? estimateReadingTime(content) : null;
+          const { seriesSlug, seriesName } = extractSeriesFromUrl(link);
 
-      // Use first category as primary category; remaining as tags
-      // (Astro RSS plugin outputs tags as <category> elements too)
-      const categories: string[] = allCats.slice(0, 1);
-      const tags: string[] = allCats.length > 1 ? allCats.slice(1) : allCats;
-
-      const slug = extractSlugFromUrl(link);
-      const coverImage = extractCoverImage(content);
-      const readingTime = content ? estimateReadingTime(content) : null;
-      const { seriesSlug, seriesName } = extractSeriesFromUrl(link);
-
-      return {
-        slug,
-        title,
-        description,
-        pubDate,
-        link,
-        coverImage,
-        categories,
-        tags,
-        readingTime,
-        locale,
-        content,
-        series: seriesName,
-        seriesSlug,
-      };
-    });
-
-    cache[locale] = { posts, timestamp: now };
-    return posts;
-  } catch (err) {
-    if (cache[locale]) return cache[locale].posts;
-    throw err;
+          return {
+            slug,
+            title,
+            description,
+            pubDate,
+            link,
+            coverImage,
+            categories,
+            tags,
+            readingTime,
+            locale,
+            content,
+            series: seriesName,
+            seriesSlug,
+          };
+        });
+      }
+    }
+  } catch {
+    // fall through to sitemap scraping
   }
+
+  const rssPostLinks = new Set(
+    rssPosts.map((p) => p.link.replace(/\/+$/, ""))
+  );
+
+  let sitemapPosts: BlogPost[] = [];
+  try {
+    const sitemapUrls = await fetchSitemapPostUrls(locale);
+    const newUrls = sitemapUrls.filter(
+      (u) => !rssPostLinks.has(u.replace(/\/+$/, ""))
+    );
+
+    if (newUrls.length > 0) {
+      const results = await Promise.allSettled(
+        newUrls.map((u) => fetchPostMetadataFromPage(u, locale))
+      );
+      sitemapPosts = results
+        .filter(
+          (r): r is PromiseFulfilledResult<BlogPost> =>
+            r.status === "fulfilled" && r.value !== null
+        )
+        .map((r) => r.value);
+    }
+  } catch {
+    // ignore sitemap errors
+  }
+
+  const allPosts = [...rssPosts, ...sitemapPosts].sort((a, b) => {
+    const da = a.pubDate ? new Date(a.pubDate).getTime() : 0;
+    const db = b.pubDate ? new Date(b.pubDate).getTime() : 0;
+    return db - da;
+  });
+
+  const posts = allPosts.length > 0 ? allPosts : (cache[locale]?.posts ?? []);
+  cache[locale] = { posts, timestamp: now };
+  return posts;
 }
 
 router.get("/posts", async (req, res) => {
   try {
     const locale = (req.query["locale"] as string) || "en";
     const category = req.query["category"] as string | undefined;
-
     const tag = req.query["tag"] as string | undefined;
+    const series = req.query["series"] as string | undefined;
+    const page = Math.max(1, parseInt((req.query["page"] as string) || "1", 10));
+    const limit = Math.min(100, Math.max(1, parseInt((req.query["limit"] as string) || "20", 10)));
+
     let posts = await fetchFeed(locale);
 
     if (category) {
@@ -231,12 +387,23 @@ router.get("/posts", async (req, res) => {
       );
     }
 
-    const series = req.query["series"] as string | undefined;
     if (series) {
       posts = posts.filter((p) => p.seriesSlug === series);
     }
 
-    res.json(posts);
+    const total = posts.length;
+    const totalPages = Math.ceil(total / limit);
+    const offset = (page - 1) * limit;
+    const paginated = posts.slice(offset, offset + limit);
+
+    res.json({
+      posts: paginated,
+      page,
+      limit,
+      total,
+      totalPages,
+      hasMore: page < totalPages,
+    });
   } catch {
     res.status(500).json({ error: "Failed to fetch posts" });
   }
@@ -253,13 +420,11 @@ router.get("/posts/:slug", async (req, res) => {
       return;
     }
 
-    // Scrape full article content if not already in the feed
     let articleContent = post.content;
     if (!articleContent && post.link) {
       articleContent = await fetchPostContent(post.link);
     }
 
-    // Related posts: same series or overlapping categories, exclude self
     const allPosts = await fetchFeed(locale);
     const related = allPosts
       .filter((p) => p.slug !== post.slug)

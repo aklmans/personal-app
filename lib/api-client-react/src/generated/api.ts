@@ -15,6 +15,7 @@ import type {
 
 import type {
   BlogPost,
+  BlogPostPage,
   BlogTaxonomy,
   ErrorResponse,
   GetBlogPostParams,
@@ -25,8 +26,6 @@ import type {
   ListBlogTagsParams,
   SearchBlogPostsParams,
 } from "./api.schemas";
-
-type PartialUseQueryOptions<TData, TError, TData2 = TData, TKey extends readonly unknown[] = readonly unknown[]> = Omit<UseQueryOptions<TData, TError, TData2, TKey>, "queryKey"> & { queryKey?: UseQueryOptions<TData, TError, TData2, TKey>["queryKey"] };
 
 import { customFetch } from "../custom-fetch";
 import type { ErrorType } from "../custom-fetch";
@@ -62,7 +61,7 @@ export const getHealthCheckQueryOptions = <
   TData = Awaited<ReturnType<typeof healthCheck>>,
   TError = ErrorType<unknown>,
 >(options?: {
-  query?: PartialUseQueryOptions<
+  query?: UseQueryOptions<
     Awaited<ReturnType<typeof healthCheck>>,
     TError,
     TData
@@ -97,7 +96,7 @@ export function useHealthCheck<
   TData = Awaited<ReturnType<typeof healthCheck>>,
   TError = ErrorType<unknown>,
 >(options?: {
-  query?: PartialUseQueryOptions<
+  query?: UseQueryOptions<
     Awaited<ReturnType<typeof healthCheck>>,
     TError,
     TData
@@ -114,7 +113,7 @@ export function useHealthCheck<
 }
 
 /**
- * Returns posts from the RSS feed
+ * Returns posts from the RSS feed and sitemap, paginated
  * @summary List blog posts
  */
 export const getListBlogPostsUrl = (params?: ListBlogPostsParams) => {
@@ -136,8 +135,8 @@ export const getListBlogPostsUrl = (params?: ListBlogPostsParams) => {
 export const listBlogPosts = async (
   params?: ListBlogPostsParams,
   options?: RequestInit,
-): Promise<BlogPost[]> => {
-  return customFetch<BlogPost[]>(getListBlogPostsUrl(params), {
+): Promise<BlogPostPage> => {
+  return customFetch<BlogPostPage>(getListBlogPostsUrl(params), {
     ...options,
     method: "GET",
   });
@@ -153,7 +152,7 @@ export const getListBlogPostsQueryOptions = <
 >(
   params?: ListBlogPostsParams,
   options?: {
-    query?: PartialUseQueryOptions<
+    query?: UseQueryOptions<
       Awaited<ReturnType<typeof listBlogPosts>>,
       TError,
       TData
@@ -191,7 +190,7 @@ export function useListBlogPosts<
 >(
   params?: ListBlogPostsParams,
   options?: {
-    query?: PartialUseQueryOptions<
+    query?: UseQueryOptions<
       Awaited<ReturnType<typeof listBlogPosts>>,
       TError,
       TData
@@ -252,7 +251,7 @@ export const getGetBlogPostQueryOptions = <
   slug: string,
   params?: GetBlogPostParams,
   options?: {
-    query?: PartialUseQueryOptions<
+    query?: UseQueryOptions<
       Awaited<ReturnType<typeof getBlogPost>>,
       TError,
       TData
@@ -297,7 +296,7 @@ export function useGetBlogPost<
   slug: string,
   params?: GetBlogPostParams,
   options?: {
-    query?: PartialUseQueryOptions<
+    query?: UseQueryOptions<
       Awaited<ReturnType<typeof getBlogPost>>,
       TError,
       TData
@@ -355,7 +354,7 @@ export const getListBlogCategoriesQueryOptions = <
 >(
   params?: ListBlogCategoriesParams,
   options?: {
-    query?: PartialUseQueryOptions<
+    query?: UseQueryOptions<
       Awaited<ReturnType<typeof listBlogCategories>>,
       TError,
       TData
@@ -394,7 +393,7 @@ export function useListBlogCategories<
 >(
   params?: ListBlogCategoriesParams,
   options?: {
-    query?: PartialUseQueryOptions<
+    query?: UseQueryOptions<
       Awaited<ReturnType<typeof listBlogCategories>>,
       TError,
       TData
@@ -450,7 +449,7 @@ export const getListBlogTagsQueryOptions = <
 >(
   params?: ListBlogTagsParams,
   options?: {
-    query?: PartialUseQueryOptions<
+    query?: UseQueryOptions<
       Awaited<ReturnType<typeof listBlogTags>>,
       TError,
       TData
@@ -488,7 +487,7 @@ export function useListBlogTags<
 >(
   params?: ListBlogTagsParams,
   options?: {
-    query?: PartialUseQueryOptions<
+    query?: UseQueryOptions<
       Awaited<ReturnType<typeof listBlogTags>>,
       TError,
       TData
@@ -544,7 +543,7 @@ export const getListBlogSeriesQueryOptions = <
 >(
   params?: ListBlogSeriesParams,
   options?: {
-    query?: PartialUseQueryOptions<
+    query?: UseQueryOptions<
       Awaited<ReturnType<typeof listBlogSeries>>,
       TError,
       TData
@@ -582,7 +581,7 @@ export function useListBlogSeries<
 >(
   params?: ListBlogSeriesParams,
   options?: {
-    query?: PartialUseQueryOptions<
+    query?: UseQueryOptions<
       Awaited<ReturnType<typeof listBlogSeries>>,
       TError,
       TData
@@ -638,7 +637,7 @@ export const getSearchBlogPostsQueryOptions = <
 >(
   params: SearchBlogPostsParams,
   options?: {
-    query?: PartialUseQueryOptions<
+    query?: UseQueryOptions<
       Awaited<ReturnType<typeof searchBlogPosts>>,
       TError,
       TData
@@ -676,7 +675,7 @@ export function useSearchBlogPosts<
 >(
   params: SearchBlogPostsParams,
   options?: {
-    query?: PartialUseQueryOptions<
+    query?: UseQueryOptions<
       Awaited<ReturnType<typeof searchBlogPosts>>,
       TError,
       TData

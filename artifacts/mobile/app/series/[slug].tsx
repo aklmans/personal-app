@@ -1,9 +1,10 @@
 import { Feather } from "@expo/vector-icons";
-import { useListBlogPosts, useListBlogSeries } from "@workspace/api-client-react";
+import { useListBlogSeries, queryOpts } from "@workspace/api-client-react";
 import type { BlogPost } from "@workspace/api-client-react";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import React, { useCallback, useEffect } from "react";
 import {
+  ActivityIndicator,
   FlatList,
   Platform,
   Pressable,
@@ -17,6 +18,7 @@ import { PostCard } from "@/components/PostCard";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { fonts } from "@/constants/fonts";
 import { useLanguage } from "@/context/LanguageContext";
+import { usePaginatedPosts } from "@/hooks/usePaginatedPosts";
 import { useColors } from "@/hooks/useColors";
 
 type PostData = BlogPost;
@@ -30,14 +32,21 @@ export default function SeriesScreen() {
   const { locale, isZh } = useLanguage();
 
   const isAll = slug === "all";
-  const { data: posts, isLoading, refetch, isRefetching } = useListBlogPosts(
-    isAll ? { locale } : { locale, series: slug },
-    { query: { enabled: true, refetchOnWindowFocus: false } }
-  );
+  const {
+    data,
+    isLoading,
+    refetch,
+    isRefetching,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = usePaginatedPosts({ locale, series: isAll ? undefined : slug });
+
+  const allPosts = data?.pages.flatMap((p) => p.posts) ?? [];
 
   const { data: seriesList } = useListBlogSeries(
     { locale },
-    { query: { refetchOnWindowFocus: false } }
+    { query: queryOpts({ refetchOnWindowFocus: false }) }
   );
 
   const currentSeries = seriesList?.find((s) => s.slug === slug);
@@ -50,8 +59,6 @@ export default function SeriesScreen() {
     });
   }, [navigation, currentSeries, isAll, isZh, slug]);
 
-  const filteredPosts = posts ?? [];
-
   const handlePostPress = useCallback(
     (post: PostData) => {
       router.push({
@@ -61,6 +68,10 @@ export default function SeriesScreen() {
     },
     [router, locale]
   );
+
+  const handleEndReached = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) fetchNextPage();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const bottomPad = insets.bottom + 16 + (Platform.OS === "web" ? 34 : 0);
 
@@ -74,6 +85,12 @@ export default function SeriesScreen() {
       </View>
     );
   }
+
+  const ListFooter = isFetchingNextPage ? (
+    <View style={styles.footerLoader}>
+      <ActivityIndicator size="small" color={colors.primary} />
+    </View>
+  ) : null;
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
@@ -105,7 +122,7 @@ export default function SeriesScreen() {
       )}
 
       <FlatList
-        data={isLoading ? Array(3).fill(null) : filteredPosts}
+        data={isLoading ? Array(3).fill(null) : (allPosts as PostData[])}
         keyExtractor={(item, i) => (item ? item.slug : `skel-${i}`)}
         renderItem={({ item }) =>
           item ? (
@@ -114,8 +131,11 @@ export default function SeriesScreen() {
             <SkeletonCard />
           )
         }
+        ListFooterComponent={ListFooter}
         contentContainerStyle={[styles.list, { paddingBottom: bottomPad }]}
         showsVerticalScrollIndicator={false}
+        onEndReached={handleEndReached}
+        onEndReachedThreshold={0.4}
         onRefresh={refetch}
         refreshing={isRefetching}
         ListEmptyComponent={
@@ -157,4 +177,8 @@ const styles = StyleSheet.create({
   chipCount: { fontSize: 12 },
   list: { paddingTop: 8 },
   emptyText: { fontSize: 16, marginTop: 8 },
+  footerLoader: {
+    paddingVertical: 20,
+    alignItems: "center",
+  },
 });

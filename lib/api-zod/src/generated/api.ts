@@ -16,45 +16,63 @@ export const HealthCheckResponse = zod.object({
 });
 
 /**
- * Returns posts from the RSS feed
+ * Returns posts from the RSS feed and sitemap, paginated
  * @summary List blog posts
  */
 export const listBlogPostsQueryLocaleDefault = `en`;
+export const listBlogPostsQueryPageDefault = 1;
+
+export const listBlogPostsQueryLimitDefault = 20;
+export const listBlogPostsQueryLimitMax = 100;
 
 export const ListBlogPostsQueryParams = zod.object({
   locale: zod.enum(["en", "zh-cn"]).default(listBlogPostsQueryLocaleDefault),
   category: zod.coerce.string().optional(),
   tag: zod.coerce.string().optional(),
   series: zod.coerce.string().optional(),
+  page: zod.coerce.number().min(1).default(listBlogPostsQueryPageDefault),
+  limit: zod.coerce
+    .number()
+    .min(1)
+    .max(listBlogPostsQueryLimitMax)
+    .default(listBlogPostsQueryLimitDefault),
 });
 
-export const ListBlogPostsResponseItem = zod.object({
-  slug: zod.string(),
-  title: zod.string(),
-  description: zod.string(),
-  pubDate: zod.string(),
-  link: zod.string(),
-  coverImage: zod.string().nullish(),
-  categories: zod.array(zod.string()),
-  tags: zod.array(zod.string()),
-  readingTime: zod.number().nullish(),
-  locale: zod.string(),
-  content: zod.string().nullish(),
-  series: zod.string().nullish(),
-  seriesSlug: zod.string().nullish(),
-  related: zod
-    .array(
-      zod.object({
-        slug: zod.string(),
-        title: zod.string(),
-        description: zod.string(),
-        pubDate: zod.string(),
-        categories: zod.array(zod.string()),
-      }),
-    )
-    .nullish(),
+export const ListBlogPostsResponse = zod.object({
+  posts: zod.array(
+    zod.object({
+      slug: zod.string(),
+      title: zod.string(),
+      description: zod.string(),
+      pubDate: zod.string(),
+      link: zod.string(),
+      coverImage: zod.string().nullish(),
+      categories: zod.array(zod.string()),
+      tags: zod.array(zod.string()),
+      readingTime: zod.number().nullish(),
+      locale: zod.string(),
+      content: zod.string().nullish(),
+      series: zod.string().nullish(),
+      seriesSlug: zod.string().nullish(),
+      related: zod
+        .array(
+          zod.object({
+            slug: zod.string(),
+            title: zod.string(),
+            description: zod.string(),
+            pubDate: zod.string(),
+            categories: zod.array(zod.string()),
+          }),
+        )
+        .nullish(),
+    }),
+  ),
+  page: zod.number(),
+  limit: zod.number(),
+  total: zod.number(),
+  totalPages: zod.number(),
+  hasMore: zod.boolean(),
 });
-export const ListBlogPostsResponse = zod.array(ListBlogPostsResponseItem);
 
 /**
  * @summary Get a single blog post

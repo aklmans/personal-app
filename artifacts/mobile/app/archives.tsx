@@ -1,6 +1,5 @@
-import { useListBlogPosts } from "@workspace/api-client-react";
 import { useRouter } from "expo-router";
-import React, { useCallback, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo } from "react";
 import {
   FlatList,
   Platform,
@@ -15,6 +14,7 @@ import type { PostData } from "@/components/PostCard";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { fonts } from "@/constants/fonts";
 import { useLanguage } from "@/context/LanguageContext";
+import { usePaginatedPosts } from "@/hooks/usePaginatedPosts";
 import { useColors } from "@/hooks/useColors";
 
 type ArchiveItem =
@@ -46,16 +46,19 @@ export default function ArchivesScreen() {
   const insets = useSafeAreaInsets();
   const { locale, isZh } = useLanguage();
 
-  const { data: posts, isLoading } = useListBlogPosts(
-    { locale },
-    { query: { refetchOnWindowFocus: false } }
-  );
+  const { data, isLoading, fetchNextPage, hasNextPage } = usePaginatedPosts({ locale, limit: 100 });
+
+  useEffect(() => {
+    if (hasNextPage) fetchNextPage();
+  }, [hasNextPage, fetchNextPage]);
+
+  const allPosts = data?.pages.flatMap((p) => p.posts) ?? [];
 
   const items: ArchiveItem[] = useMemo(() => {
-    if (!posts) return [];
+    if (allPosts.length === 0) return [];
     const result: ArchiveItem[] = [];
     let lastYear = "";
-    for (const post of posts) {
+    for (const post of allPosts) {
       const year = getYear((post as PostData).pubDate);
       if (year !== lastYear) {
         result.push({ type: "header", year, key: `year-${year}` });
@@ -64,7 +67,7 @@ export default function ArchivesScreen() {
       result.push({ type: "post", post: post as PostData, key: (post as PostData).slug });
     }
     return result;
-  }, [posts]);
+  }, [allPosts]);
 
   const handlePostPress = useCallback(
     (post: PostData) => {

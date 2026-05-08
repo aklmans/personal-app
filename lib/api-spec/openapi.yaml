@@ -31,7 +31,7 @@ paths:
       operationId: listBlogPosts
       tags: [blog]
       summary: List blog posts
-      description: Returns posts from the RSS feed
+      description: Returns posts from the RSS feed and sitemap, paginated
       parameters:
         - name: locale
           in: query
@@ -55,15 +55,28 @@ paths:
           required: false
           schema:
             type: string
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
       responses:
         "200":
-          description: List of blog posts
+          description: Paginated list of blog posts
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/BlogPost"
+                $ref: "#/components/schemas/BlogPostPage"
   /blog/posts/{slug}:
     get:
       operationId: getBlogPost
@@ -283,6 +296,30 @@ components:
         - slug
         - name
         - count
+    BlogPostPage:
+      type: object
+      properties:
+        posts:
+          type: array
+          items:
+            $ref: "#/components/schemas/BlogPost"
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+        hasMore:
+          type: boolean
+      required:
+        - posts
+        - page
+        - limit
+        - total
+        - totalPages
+        - hasMore
     ErrorResponse:
       type: object
       properties:

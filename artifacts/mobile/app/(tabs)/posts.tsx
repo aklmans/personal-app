@@ -1,10 +1,11 @@
 import {
   useListBlogCategories,
-  useListBlogPosts,
+  queryOpts,
 } from "@workspace/api-client-react";
 import { useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
 import {
+  ActivityIndicator,
   FlatList,
   Platform,
   RefreshControl,
@@ -21,6 +22,7 @@ import { PostCard } from "@/components/PostCard";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { fonts } from "@/constants/fonts";
 import { useLanguage } from "@/context/LanguageContext";
+import { usePaginatedPosts } from "@/hooks/usePaginatedPosts";
 import { useColors } from "@/hooks/useColors";
 
 export default function PostsScreen() {
@@ -32,14 +34,22 @@ export default function PostsScreen() {
     undefined
   );
 
-  const { data: posts, isLoading, refetch, isRefetching } = useListBlogPosts(
-    { locale, category: selectedCategory },
-    { query: { refetchOnWindowFocus: false } }
-  );
+  const {
+    data,
+    isLoading,
+    refetch,
+    isRefetching,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = usePaginatedPosts({ locale, category: selectedCategory, limit: 20 });
+
+  const allPosts = data?.pages.flatMap((p) => p.posts) ?? [];
+  const total = data?.pages[0]?.total ?? 0;
 
   const { data: categories } = useListBlogCategories(
     { locale },
-    { query: { refetchOnWindowFocus: false } }
+    { query: queryOpts({ refetchOnWindowFocus: false }) }
   );
 
   const topPad = Platform.OS === "web" ? Math.max(insets.top, 67) : insets.top;
@@ -53,6 +63,12 @@ export default function PostsScreen() {
     },
     [router, locale]
   );
+
+  const handleEndReached = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const renderItem = useCallback(
     ({ item }: { item: PostData }) => (
@@ -81,14 +97,14 @@ export default function PostsScreen() {
         >
           {isZh ? "文章" : "Posts"}
         </Text>
-        {posts && (
+        {total > 0 && (
           <Text
             style={[
               styles.count,
               { color: colors.mutedForeground, fontFamily: fonts.sans.regular },
             ]}
           >
-            {posts.length}
+            {total}
           </Text>
         )}
       </View>
@@ -121,6 +137,12 @@ export default function PostsScreen() {
     </View>
   );
 
+  const ListFooter = isFetchingNextPage ? (
+    <View style={styles.footerLoader}>
+      <ActivityIndicator size="small" color={colors.primary} />
+    </View>
+  ) : null;
+
   if (isLoading) {
     return (
       <View style={[styles.root, { backgroundColor: colors.background }]}>
@@ -137,16 +159,19 @@ export default function PostsScreen() {
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <FlatList
-        data={(posts ?? []) as PostData[]}
+        data={allPosts as PostData[]}
         keyExtractor={(item) => item.slug}
         renderItem={renderItem}
         ListHeaderComponent={ListHeader}
+        ListFooterComponent={ListFooter}
         contentContainerStyle={[
           styles.listContent,
           { paddingBottom: insets.bottom + 16 + (Platform.OS === "web" ? 34 : 0) },
         ]}
         showsVerticalScrollIndicator={false}
-        scrollEnabled={!!(posts && posts.length > 0)}
+        scrollEnabled={allPosts.length > 0}
+        onEndReached={handleEndReached}
+        onEndReachedThreshold={0.4}
         refreshControl={
           <RefreshControl
             refreshing={isRefetching}
@@ -208,5 +233,9 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 15,
+  },
+  footerLoader: {
+    paddingVertical: 20,
+    alignItems: "center",
   },
 });

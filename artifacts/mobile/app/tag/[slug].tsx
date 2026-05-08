@@ -1,11 +1,11 @@
-import { useListBlogPosts, useListBlogTags } from "@workspace/api-client-react";
+import { useListBlogTags, queryOpts } from "@workspace/api-client-react";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import React, { useCallback, useEffect } from "react";
 import {
+  ActivityIndicator,
   FlatList,
   Platform,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -18,6 +18,7 @@ import { PostCard } from "@/components/PostCard";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { fonts } from "@/constants/fonts";
 import { useLanguage } from "@/context/LanguageContext";
+import { usePaginatedPosts } from "@/hooks/usePaginatedPosts";
 import { useColors } from "@/hooks/useColors";
 
 export default function TagScreen() {
@@ -29,14 +30,21 @@ export default function TagScreen() {
   const { locale, isZh } = useLanguage();
 
   const isAll = slug === "all";
-  const { data: posts, isLoading, refetch, isRefetching } = useListBlogPosts(
-    isAll ? { locale } : { locale, tag: slug },
-    { query: { enabled: true, refetchOnWindowFocus: false } }
-  );
+  const {
+    data,
+    isLoading,
+    refetch,
+    isRefetching,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = usePaginatedPosts({ locale, tag: isAll ? undefined : slug });
+
+  const allPosts = data?.pages.flatMap((p) => p.posts) ?? [];
 
   const { data: tags } = useListBlogTags(
     { locale },
-    { query: { refetchOnWindowFocus: false } }
+    { query: queryOpts({ refetchOnWindowFocus: false }) }
   );
 
   const currentTag = tags?.find((t) => t.slug === slug);
@@ -49,8 +57,6 @@ export default function TagScreen() {
     });
   }, [navigation, currentTag, isAll, isZh, slug]);
 
-  const filteredPosts = posts ?? [];
-
   const handlePostPress = useCallback(
     (post: PostData) => {
       router.push({
@@ -60,6 +66,10 @@ export default function TagScreen() {
     },
     [router, locale]
   );
+
+  const handleEndReached = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) fetchNextPage();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const renderItem = useCallback(
     ({ item }: { item: PostData }) => (
@@ -92,6 +102,12 @@ export default function TagScreen() {
     </View>
   ) : null;
 
+  const ListFooter = isFetchingNextPage ? (
+    <View style={styles.footerLoader}>
+      <ActivityIndicator size="small" color={colors.primary} />
+    </View>
+  ) : null;
+
   if (isLoading) {
     return (
       <View style={[styles.root, { backgroundColor: colors.background, paddingHorizontal: 16, paddingTop: 12 }]}>
@@ -104,10 +120,11 @@ export default function TagScreen() {
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <FlatList
-        data={filteredPosts as PostData[]}
+        data={allPosts as PostData[]}
         keyExtractor={(item) => item.slug}
         renderItem={renderItem}
         ListHeaderComponent={ListHeader}
+        ListFooterComponent={ListFooter}
         contentContainerStyle={[
           styles.listContent,
           {
@@ -116,7 +133,9 @@ export default function TagScreen() {
           },
         ]}
         showsVerticalScrollIndicator={false}
-        scrollEnabled={!!(filteredPosts && filteredPosts.length > 0)}
+        scrollEnabled={allPosts.length > 0}
+        onEndReached={handleEndReached}
+        onEndReachedThreshold={0.4}
         refreshControl={
           <RefreshControl
             refreshing={isRefetching}
@@ -170,5 +189,9 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 15,
+  },
+  footerLoader: {
+    paddingVertical: 20,
+    alignItems: "center",
   },
 });

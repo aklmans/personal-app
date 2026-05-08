@@ -40,6 +40,15 @@ export interface BlogTaxonomy {
   count: number;
 }
 
+export interface BlogPostPage {
+  posts: BlogPost[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasMore: boolean;
+}
+
 export interface ErrorResponse {
   error: string;
 }
@@ -49,6 +58,15 @@ export type ListBlogPostsParams = {
   category?: string;
   tag?: string;
   series?: string;
+  /**
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
 };
 
 export type ListBlogPostsLocale =
