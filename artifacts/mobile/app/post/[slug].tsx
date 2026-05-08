@@ -173,11 +173,19 @@ function buildHtml(
     : "https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism.min.css";
 
   const highlightScript = `(function() {
+  function detectLang(pre, code) {
+    var dl = pre.getAttribute('data-language');
+    if (dl) return dl;
+    var cls = (code ? code.className : '') || pre.className || '';
+    var m = cls.match(/(?:^|\\s)language-(\\S+)/);
+    if (m) return m[1];
+    return 'text';
+  }
   var pres = document.querySelectorAll('pre.astro-code, pre.shiki');
   for (var i = 0; i < pres.length; i++) {
     var pre = pres[i];
-    var lang = pre.getAttribute('data-language') || 'text';
     var code = pre.querySelector('code');
+    var lang = detectLang(pre, code);
     if (!code) continue;
     var lineEls = code.querySelectorAll('.line');
     var rawText;
