@@ -128,9 +128,9 @@ const fontCtrlStyles = StyleSheet.create({
 });
 
 const SPACING_OPTS: { value: LineSpacing; label: string; labelZh: string }[] = [
-  { value: 1.6, label: "Compact", labelZh: "紧凑" },
-  { value: 1.85, label: "Default", labelZh: "默认" },
-  { value: 2.1, label: "Relaxed", labelZh: "宽松" },
+  { value: LINE_SPACING_PRESETS[0], label: "Compact", labelZh: "紧凑" },
+  { value: LINE_SPACING_PRESETS[1], label: "Default", labelZh: "默认" },
+  { value: LINE_SPACING_PRESETS[2], label: "Relaxed", labelZh: "宽松" },
 ];
 
 const WIDTH_OPTS: {
