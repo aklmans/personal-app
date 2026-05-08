@@ -22,6 +22,44 @@ import { useColors } from "@/hooks/useColors";
 import { useTheme } from "@/context/ThemeContext";
 import { useLanguage } from "@/context/LanguageContext";
 
+function PostHeaderTitle({
+  title,
+  progressAnim,
+  primaryColor,
+  borderColor,
+  textColor,
+}: {
+  title: string;
+  progressAnim: Animated.Value;
+  primaryColor: string;
+  borderColor: string;
+  textColor: string;
+}) {
+  const progressWidth = progressAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0%", "100%"],
+  });
+  return (
+    <View style={headerTitleStyles.wrap}>
+      <Text numberOfLines={1} style={[headerTitleStyles.title, { color: textColor }]}>
+        {title}
+      </Text>
+      <View style={[headerTitleStyles.track, { backgroundColor: borderColor }]}>
+        <Animated.View
+          style={[headerTitleStyles.fill, { backgroundColor: primaryColor, width: progressWidth }]}
+        />
+      </View>
+    </View>
+  );
+}
+
+const headerTitleStyles = StyleSheet.create({
+  wrap: { alignItems: "center", width: "100%" },
+  title: { fontSize: 16, letterSpacing: -0.2, fontFamily: "Lora_400Regular" },
+  track: { height: 2, width: "80%", borderRadius: 1, marginTop: 3, overflow: "hidden" },
+  fill: { height: "100%", borderRadius: 1 },
+});
+
 interface PostWithContent {
   slug: string;
   title: string;
@@ -210,9 +248,19 @@ export default function PostDetailScreen() {
 
   useEffect(() => {
     if (post?.title) {
-      navigation.setOptions({ title: post.title });
+      navigation.setOptions({
+        headerTitle: () => (
+          <PostHeaderTitle
+            title={post.title}
+            progressAnim={progressAnim}
+            primaryColor={colors.primary}
+            borderColor={colors.border}
+            textColor={colors.text}
+          />
+        ),
+      });
     }
-  }, [post, navigation]);
+  }, [post, navigation, progressAnim, colors]);
 
   const htmlContent = useMemo(
     () => (post ? buildHtml(post.content ?? "", colors, isDark) : ""),
@@ -273,25 +321,8 @@ export default function PostDetailScreen() {
   const tags = post.tags ?? [];
   const related = post.related ?? [];
 
-  const progressWidth = progressAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["0%", "100%"],
-  });
-
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
-      <View
-        style={[styles.progressTrack, { backgroundColor: colors.border }]}
-        pointerEvents="none"
-      >
-        <Animated.View
-          style={[
-            styles.progressFill,
-            { backgroundColor: colors.primary, width: progressWidth },
-          ]}
-        />
-      </View>
-
       {Platform.OS === "web" ? (
         <iframe
           srcDoc={htmlContent}
@@ -484,15 +515,6 @@ export default function PostDetailScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   center: { alignItems: "center", justifyContent: "center", gap: 12 },
-  progressTrack: {
-    height: 3,
-    width: "100%",
-    overflow: "hidden",
-  },
-  progressFill: {
-    height: "100%",
-    borderRadius: 2,
-  },
   webview: { flex: 1 },
   metaSection: {
     borderTopWidth: StyleSheet.hairlineWidth,
