@@ -9,6 +9,7 @@ import {
 } from "react-native";
 
 import { fonts } from "@/constants/fonts";
+import { useBookmarks } from "@/context/BookmarksContext";
 import { useColors } from "@/hooks/useColors";
 
 export interface PostData {
@@ -42,6 +43,8 @@ function formatDate(pubDate: string): string {
 
 export function PostCard({ post, onPress }: PostCardProps) {
   const colors = useColors();
+  const { isBookmarked, toggleBookmark } = useBookmarks();
+  const bookmarked = isBookmarked(post.slug, post.locale);
 
   return (
     <Pressable
@@ -97,19 +100,37 @@ export function PostCard({ post, onPress }: PostCardProps) {
           {post.description}
         </Text>
         <View style={styles.meta}>
-          <Text
-            style={[styles.metaText, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}
-          >
-            {formatDate(post.pubDate)}
-          </Text>
-          {post.readingTime != null && (
+          <View style={styles.metaLeft}>
             <Text
               style={[styles.metaText, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}
             >
-              {" · "}
-              {post.readingTime} min read
+              {formatDate(post.pubDate)}
             </Text>
-          )}
+            {post.readingTime != null && (
+              <Text
+                style={[styles.metaText, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}
+              >
+                {" · "}
+                {post.readingTime} min read
+              </Text>
+            )}
+          </View>
+          <Pressable
+            onPress={(e) => {
+              e.stopPropagation();
+              toggleBookmark(post);
+            }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={({ pressed }) => [styles.bookmarkBtn, { opacity: pressed ? 0.5 : 1 }]}
+            accessibilityLabel={bookmarked ? "Remove bookmark" : "Bookmark article"}
+            accessibilityRole="button"
+          >
+            <Feather
+              name="bookmark"
+              size={16}
+              color={bookmarked ? colors.primary : colors.mutedForeground}
+            />
+          </Pressable>
         </View>
       </View>
     </Pressable>
@@ -155,8 +176,16 @@ const styles = StyleSheet.create({
   meta: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+  },
+  metaLeft: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   metaText: {
     fontSize: 12,
+  },
+  bookmarkBtn: {
+    padding: 2,
   },
 });

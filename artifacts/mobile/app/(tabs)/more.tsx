@@ -2,6 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import * as WebBrowser from "expo-web-browser";
 import React, { useCallback } from "react";
 import {
+  Image,
   Platform,
   Pressable,
   ScrollView,
@@ -13,6 +14,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 
 import { fonts } from "@/constants/fonts";
+import { useBookmarks } from "@/context/BookmarksContext";
+import { useHistory } from "@/context/HistoryContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useTheme, type ThemePreference } from "@/context/ThemeContext";
 import { useColors } from "@/hooks/useColors";
@@ -36,6 +39,8 @@ export default function MoreScreen() {
   const { locale, toggleLocale, isZh } = useLanguage();
   const { preference, setPreference } = useTheme();
   const router = useRouter();
+  const { bookmarks, toggleBookmark } = useBookmarks();
+  const { history, clearHistory } = useHistory();
   const topPad = Platform.OS === "web" ? Math.max(insets.top, 67) : insets.top;
 
   const openUrl = useCallback(async (url: string) => {
@@ -130,6 +135,158 @@ export default function MoreScreen() {
         >
           aklman.com
         </Text>
+      </View>
+
+      <View style={[styles.section, { marginTop: 24 }]}>
+        <Text
+          style={[
+            styles.sectionLabel,
+            { color: colors.mutedForeground, fontFamily: fonts.sans.semiBold },
+          ]}
+        >
+          {isZh ? "书签" : "BOOKMARKS"}
+        </Text>
+        {bookmarks.length === 0 ? (
+          <View style={[styles.emptyBookmarks, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Feather name="bookmark" size={22} color={colors.mutedForeground} />
+            <Text style={[styles.emptyBookmarksText, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}>
+              {isZh ? "尚无书签。在文章页面点击书签图标即可保存。" : "No bookmarks yet. Tap the bookmark icon on any article to save it."}
+            </Text>
+          </View>
+        ) : (
+          bookmarks.map((post) => (
+            <Pressable
+              key={post.slug}
+              onPress={() =>
+                router.push({
+                  pathname: "/post/[slug]",
+                  params: { slug: post.slug, locale: post.locale },
+                })
+              }
+              style={({ pressed }) => [
+                styles.bookmarkRow,
+                {
+                  backgroundColor: pressed ? colors.secondary : colors.card,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              {post.coverImage ? (
+                <Image
+                  source={{ uri: post.coverImage }}
+                  style={[styles.bookmarkThumb, { backgroundColor: colors.muted }]}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View style={[styles.bookmarkThumb, styles.bookmarkThumbPlaceholder, { backgroundColor: colors.muted }]}>
+                  <Feather name="book-open" size={16} color={colors.mutedForeground} />
+                </View>
+              )}
+              <View style={styles.bookmarkContent}>
+                <Text
+                  style={[styles.bookmarkTitle, { color: colors.text, fontFamily: fonts.serif.semiBold }]}
+                  numberOfLines={2}
+                >
+                  {post.title}
+                </Text>
+                {post.categories.length > 0 && (
+                  <Text style={[styles.bookmarkMeta, { color: colors.primary, fontFamily: fonts.sans.regular }]}>
+                    {post.categories[0]}
+                  </Text>
+                )}
+              </View>
+              <Pressable
+                onPress={(e) => {
+                  e.stopPropagation();
+                  toggleBookmark(post);
+                }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={({ pressed }) => ({ opacity: pressed ? 0.4 : 1, padding: 4 })}
+                accessibilityLabel="Remove bookmark"
+                accessibilityRole="button"
+              >
+                <Feather name="x" size={16} color={colors.mutedForeground} />
+              </Pressable>
+            </Pressable>
+          ))
+        )}
+      </View>
+
+      <View style={[styles.section, { marginTop: 24 }]}>
+        <View style={styles.sectionHeader}>
+          <Text
+            style={[
+              styles.sectionLabel,
+              { color: colors.mutedForeground, fontFamily: fonts.sans.semiBold },
+            ]}
+          >
+            {isZh ? "最近阅读" : "RECENTLY READ"}
+          </Text>
+          {history.length > 0 && (
+            <Pressable
+              onPress={clearHistory}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
+            >
+              <Text style={[styles.clearBtn, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}>
+                {isZh ? "清除" : "Clear"}
+              </Text>
+            </Pressable>
+          )}
+        </View>
+        {history.length === 0 ? (
+          <View style={[styles.emptyBookmarks, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Feather name="clock" size={22} color={colors.mutedForeground} />
+            <Text style={[styles.emptyBookmarksText, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}>
+              {isZh ? "尚无阅读记录。打开文章后将自动记录在这里。" : "No reading history yet. Articles you open will appear here."}
+            </Text>
+          </View>
+        ) : (
+          history.slice(0, 10).map((post) => (
+            <Pressable
+              key={post.slug}
+              onPress={() =>
+                router.push({
+                  pathname: "/post/[slug]",
+                  params: { slug: post.slug, locale: post.locale },
+                })
+              }
+              style={({ pressed }) => [
+                styles.bookmarkRow,
+                {
+                  backgroundColor: pressed ? colors.secondary : colors.card,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              {post.coverImage ? (
+                <Image
+                  source={{ uri: post.coverImage }}
+                  style={[styles.bookmarkThumb, { backgroundColor: colors.muted }]}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View style={[styles.bookmarkThumb, styles.bookmarkThumbPlaceholder, { backgroundColor: colors.muted }]}>
+                  <Feather name="book-open" size={16} color={colors.mutedForeground} />
+                </View>
+              )}
+              <View style={styles.bookmarkContent}>
+                <Text
+                  style={[styles.bookmarkTitle, { color: colors.text, fontFamily: fonts.serif.semiBold }]}
+                  numberOfLines={2}
+                >
+                  {post.title}
+                </Text>
+                {post.categories.length > 0 && (
+                  <Text style={[styles.bookmarkMeta, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}>
+                    {post.categories[0]}
+                  </Text>
+                )}
+              </View>
+              <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+            </Pressable>
+          ))
+        )}
       </View>
 
       <View style={[styles.section, { marginTop: 24 }]}>
@@ -416,5 +573,59 @@ const styles = StyleSheet.create({
   },
   footerLink: {
     fontSize: 14,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+    marginTop: 4,
+  },
+  clearBtn: {
+    fontSize: 13,
+  },
+  emptyBookmarks: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 14,
+    borderRadius: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginBottom: 4,
+  },
+  emptyBookmarksText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  bookmarkRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderRadius: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginBottom: 4,
+    overflow: "hidden",
+    paddingRight: 10,
+  },
+  bookmarkThumb: {
+    width: 60,
+    height: 60,
+  },
+  bookmarkThumbPlaceholder: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  bookmarkContent: {
+    flex: 1,
+    paddingVertical: 8,
+  },
+  bookmarkTitle: {
+    fontSize: 14,
+    lineHeight: 19,
+    marginBottom: 3,
+  },
+  bookmarkMeta: {
+    fontSize: 12,
   },
 });

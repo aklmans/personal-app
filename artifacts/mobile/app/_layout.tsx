@@ -21,6 +21,8 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { BookmarksProvider } from "@/context/BookmarksContext";
+import { HistoryProvider } from "@/context/HistoryContext";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { useColors } from "@/hooks/useColors";
@@ -90,9 +92,13 @@ function AppProviders({ children }: { children: React.ReactNode }) {
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
           <LanguageProvider>
-            <GestureHandlerRootView>
-              <KeyboardProvider>{children}</KeyboardProvider>
-            </GestureHandlerRootView>
+            <BookmarksProvider>
+              <HistoryProvider>
+                <GestureHandlerRootView>
+                  <KeyboardProvider>{children}</KeyboardProvider>
+                </GestureHandlerRootView>
+              </HistoryProvider>
+            </BookmarksProvider>
           </LanguageProvider>
         </QueryClientProvider>
       </ErrorBoundary>

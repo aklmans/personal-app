@@ -18,6 +18,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import WebView from "react-native-webview";
 
 import { fonts } from "@/constants/fonts";
+import { useBookmarks } from "@/context/BookmarksContext";
+import { useHistory } from "@/context/HistoryContext";
 import { useColors } from "@/hooks/useColors";
 import { useTheme } from "@/context/ThemeContext";
 import { useLanguage } from "@/context/LanguageContext";
@@ -346,11 +348,14 @@ export default function PostDetailScreen() {
   }>();
   const { isZh } = useLanguage();
   const { fontSize, canIncrease, canDecrease, increase, decrease } = useReadingPrefs();
+  const { isBookmarked, toggleBookmark } = useBookmarks();
+  const { recordVisit } = useHistory();
 
   const safeLocale = (locale === "zh-cn" ? "zh-cn" : "en") as "en" | "zh-cn";
 
   const progressAnim = useRef(new Animated.Value(0)).current;
   const webViewRef = useRef<WebView>(null);
+  const recordedKeyRef = useRef<string | null>(null);
 
   const { data, isLoading, isError } = useGetBlogPost(
     slug ?? "",
@@ -375,16 +380,49 @@ export default function PostDetailScreen() {
             ),
           }
         : {}),
-      headerRight: () => (
-        <FontSizeControls
-          onDecrease={decrease}
-          onIncrease={increase}
-          canDecrease={canDecrease}
-          canIncrease={canIncrease}
-          primaryColor={colors.primary}
-          mutedColor={colors.mutedForeground}
-        />
-      ),
+      headerRight: () => {
+        const bookmarked = post ? isBookmarked(post.slug, post.locale) : false;
+        return (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+            {post && (
+              <Pressable
+                onPress={() => {
+                  if (!post) return;
+                  toggleBookmark({
+                    slug: post.slug,
+                    title: post.title,
+                    description: post.description,
+                    pubDate: post.pubDate,
+                    link: post.link,
+                    coverImage: post.coverImage,
+                    categories: post.categories,
+                    readingTime: post.readingTime,
+                    locale: post.locale,
+                  });
+                }}
+                hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+                style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1, paddingHorizontal: 6, paddingVertical: 4 })}
+                accessibilityLabel={bookmarked ? "Remove bookmark" : "Bookmark article"}
+                accessibilityRole="button"
+              >
+                <Feather
+                  name="bookmark"
+                  size={20}
+                  color={bookmarked ? colors.primary : colors.mutedForeground}
+                />
+              </Pressable>
+            )}
+            <FontSizeControls
+              onDecrease={decrease}
+              onIncrease={increase}
+              canDecrease={canDecrease}
+              canIncrease={canIncrease}
+              primaryColor={colors.primary}
+              mutedColor={colors.mutedForeground}
+            />
+          </View>
+        );
+      },
     });
   }, [
     post,
@@ -395,7 +433,27 @@ export default function PostDetailScreen() {
     increase,
     canDecrease,
     canIncrease,
+    isBookmarked,
+    toggleBookmark,
   ]);
+
+  useEffect(() => {
+    if (!post) return;
+    const key = `${post.locale}:${post.slug}`;
+    if (recordedKeyRef.current === key) return;
+    recordedKeyRef.current = key;
+    recordVisit({
+      slug: post.slug,
+      title: post.title,
+      description: post.description,
+      pubDate: post.pubDate,
+      link: post.link,
+      coverImage: post.coverImage,
+      categories: post.categories,
+      readingTime: post.readingTime,
+      locale: post.locale,
+    });
+  }, [post, recordVisit]);
 
   useEffect(() => {
     if (Platform.OS !== "web" && webViewRef.current) {
