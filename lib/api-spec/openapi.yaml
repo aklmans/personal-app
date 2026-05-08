@@ -232,6 +232,14 @@ components:
         series:
           type: string
           nullable: true
+        seriesSlug:
+          type: string
+          nullable: true
+        related:
+          type: array
+          nullable: true
+          items:
+            $ref: "#/components/schemas/RelatedPost"
       required:
         - slug
         - title
@@ -241,6 +249,27 @@ components:
         - categories
         - tags
         - locale
+    RelatedPost:
+      type: object
+      properties:
+        slug:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        pubDate:
+          type: string
+        categories:
+          type: array
+          items:
+            type: string
+      required:
+        - slug
+        - title
+        - description
+        - pubDate
+        - categories
     BlogTaxonomy:
       type: object
       properties:

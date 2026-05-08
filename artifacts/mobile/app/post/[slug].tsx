@@ -1,5 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import { useGetBlogPost } from "@workspace/api-client-react";
+import type { RelatedPost } from "@workspace/api-client-react";
 import * as WebBrowser from "expo-web-browser";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useRef } from "react";
@@ -19,14 +20,6 @@ import { fonts } from "@/constants/fonts";
 import { useColors } from "@/hooks/useColors";
 import { useTheme } from "@/context/ThemeContext";
 import { useLanguage } from "@/context/LanguageContext";
-
-interface RelatedPost {
-  slug: string;
-  title: string;
-  description: string;
-  pubDate: string;
-  categories: string[];
-}
 
 interface PostWithContent {
   slug: string;

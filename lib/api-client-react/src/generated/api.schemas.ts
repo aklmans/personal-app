@@ -9,6 +9,14 @@ export interface HealthStatus {
   status: string;
 }
 
+export interface RelatedPost {
+  slug: string;
+  title: string;
+  description: string;
+  pubDate: string;
+  categories: string[];
+}
+
 export interface BlogPost {
   slug: string;
   title: string;
@@ -22,6 +30,8 @@ export interface BlogPost {
   locale: string;
   content?: string | null;
   series?: string | null;
+  seriesSlug?: string | null;
+  related?: RelatedPost[] | null;
 }
 
 export interface BlogTaxonomy {

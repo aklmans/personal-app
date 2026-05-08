@@ -25,7 +25,8 @@ import { LanguageProvider } from "@/context/LanguageContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { useColors } from "@/hooks/useColors";
 
-setBaseUrl(`https://${process.env.EXPO_PUBLIC_DOMAIN}`);
+const domain = process.env.EXPO_PUBLIC_DOMAIN ?? "localhost:8080";
+setBaseUrl(`https://${domain}`);
 
 SplashScreen.preventAutoHideAsync();
 

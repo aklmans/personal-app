@@ -41,6 +41,18 @@ export const ListBlogPostsResponseItem = zod.object({
   locale: zod.string(),
   content: zod.string().nullish(),
   series: zod.string().nullish(),
+  seriesSlug: zod.string().nullish(),
+  related: zod
+    .array(
+      zod.object({
+        slug: zod.string(),
+        title: zod.string(),
+        description: zod.string(),
+        pubDate: zod.string(),
+        categories: zod.array(zod.string()),
+      }),
+    )
+    .nullish(),
 });
 export const ListBlogPostsResponse = zod.array(ListBlogPostsResponseItem);
 
@@ -70,6 +82,18 @@ export const GetBlogPostResponse = zod.object({
   locale: zod.string(),
   content: zod.string().nullish(),
   series: zod.string().nullish(),
+  seriesSlug: zod.string().nullish(),
+  related: zod
+    .array(
+      zod.object({
+        slug: zod.string(),
+        title: zod.string(),
+        description: zod.string(),
+        pubDate: zod.string(),
+        categories: zod.array(zod.string()),
+      }),
+    )
+    .nullish(),
 });
 
 /**
@@ -147,5 +171,17 @@ export const SearchBlogPostsResponseItem = zod.object({
   locale: zod.string(),
   content: zod.string().nullish(),
   series: zod.string().nullish(),
+  seriesSlug: zod.string().nullish(),
+  related: zod
+    .array(
+      zod.object({
+        slug: zod.string(),
+        title: zod.string(),
+        description: zod.string(),
+        pubDate: zod.string(),
+        categories: zod.array(zod.string()),
+      }),
+    )
+    .nullish(),
 });
 export const SearchBlogPostsResponse = zod.array(SearchBlogPostsResponseItem);
