@@ -313,11 +313,16 @@ function getMetadataFromDiskCache(url: string): BlogPost | null {
 }
 
 async function flushMetadataDiskCache(): Promise<void> {
+  const now = Date.now();
+  for (const [url, entry] of _diskMetaCache.entries()) {
+    if (now - entry.savedAt > METADATA_DISK_TTL) _diskMetaCache.delete(url);
+  }
   try {
     await mkdir(dirname(METADATA_DISK_CACHE_FILE), { recursive: true });
     const obj: Record<string, DiskMetadataEntry> = {};
     for (const [url, entry] of _diskMetaCache.entries()) {
-      obj[url] = entry;
+      const { content: _omit, ...meta } = entry.post;
+      obj[url] = { post: { ...meta, content: "" }, savedAt: entry.savedAt };
     }
     await writeFile(METADATA_DISK_CACHE_FILE, JSON.stringify(obj), "utf8");
   } catch (err) {
