@@ -3,6 +3,8 @@ import { resolve, dirname } from "path";
 import { Router } from "express";
 import { XMLParser } from "fast-xml-parser";
 import { logger } from "../lib/logger";
+import fs from "node:fs";
+import path from "node:path";
 
 const router = Router();
 
@@ -39,6 +41,53 @@ interface BlogTaxonomy {
 interface CacheEntry {
   posts: BlogPost[];
   timestamp: number;
+}
+
+// __dirname at runtime is <repo>/artifacts/api-server/dist (esbuild output).
+// Two levels up lands at <repo>/artifacts/data/cache — the shared persistent store.
+const DISK_CACHE_DIR = path.resolve(__dirname, "../../data/cache");
+
+function diskCachePath(locale: string): string {
+  return path.join(DISK_CACHE_DIR, `posts-${locale}.json`);
+}
+
+function loadDiskCache(): void {
+  try {
+    fs.mkdirSync(DISK_CACHE_DIR, { recursive: true });
+    for (const locale of Object.keys(RSS_FEEDS)) {
+      const file = diskCachePath(locale);
+      if (!fs.existsSync(file)) continue;
+      try {
+        const raw = fs.readFileSync(file, "utf8");
+        const entry = JSON.parse(raw) as CacheEntry;
+        if (entry && Array.isArray(entry.posts) && typeof entry.timestamp === "number" && Number.isFinite(entry.timestamp)) {
+          // Clamp the loaded timestamp so it never appears older than STALE_TTL.
+          // This guarantees the first request after restart is always served
+          // immediately from disk (stale-while-revalidate), no matter how long
+          // the server was offline.  A background refresh is triggered whenever
+          // age > CACHE_TTL, which is preserved by using Math.max.
+          const now = Date.now();
+          const minTimestamp = now - STALE_TTL + 1;
+          const timestamp = Math.max(entry.timestamp, minTimestamp);
+          cache[locale] = { posts: entry.posts, timestamp };
+          logger.info({ locale, posts: entry.posts.length }, "blog: loaded disk cache");
+        }
+      } catch (err) {
+        logger.warn({ locale, err }, "blog: failed to parse disk cache");
+      }
+    }
+  } catch (err) {
+    logger.warn({ err }, "blog: failed to initialise disk cache dir");
+  }
+}
+
+function saveDiskCache(locale: string, entry: CacheEntry): void {
+  try {
+    fs.mkdirSync(DISK_CACHE_DIR, { recursive: true });
+    fs.writeFileSync(diskCachePath(locale), JSON.stringify(entry), "utf8");
+  } catch (err) {
+    logger.warn({ locale, err }, "blog: failed to write disk cache");
+  }
 }
 
 const cache: Record<string, CacheEntry> = {};
@@ -463,7 +512,9 @@ async function doFetchFeed(locale: string): Promise<BlogPost[]> {
 
   const now = Date.now();
   const posts = allPosts.length > 0 ? allPosts : (cache[locale]?.posts ?? []);
-  cache[locale] = { posts, timestamp: now };
+  const entry: CacheEntry = { posts, timestamp: now };
+  cache[locale] = entry;
+  saveDiskCache(locale, entry);
 
   logger.info(
     {
@@ -694,6 +745,7 @@ router.get("/search", async (req, res) => {
   }
 });
 
+loadDiskCache();
 loadMetadataDiskCache().then(() => warmCache()).catch(() => warmCache());
 
 export default router;
