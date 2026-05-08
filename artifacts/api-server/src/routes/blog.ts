@@ -100,6 +100,65 @@ const inFlightFetches: Map<string, Promise<BlogPost[]>> = new Map();
 const contentCache: Map<string, { html: string; ts: number }> = new Map();
 const CONTENT_TTL = 15 * 60 * 1000;
 
+const CONTENT_DISK_CACHE_DIR = path.resolve(__dirname, "../../data/cache/content");
+const CONTENT_DISK_TTL = 24 * 60 * 60 * 1000;
+
+function contentDiskCacheKey(url: string): string {
+  return url
+    .replace(/^https?:\/\//, "")
+    .replace(/\/+$/, "")
+    .replace(/[^a-zA-Z0-9_.-]/g, "_");
+}
+
+function contentDiskCachePath(url: string): string {
+  return path.join(CONTENT_DISK_CACHE_DIR, `${contentDiskCacheKey(url)}.json`);
+}
+
+function loadContentCacheFromDisk(): void {
+  try {
+    fs.mkdirSync(CONTENT_DISK_CACHE_DIR, { recursive: true });
+    const files = fs.readdirSync(CONTENT_DISK_CACHE_DIR).filter((f) => f.endsWith(".json"));
+    const now = Date.now();
+    let loaded = 0;
+    for (const file of files) {
+      try {
+        const raw = fs.readFileSync(path.join(CONTENT_DISK_CACHE_DIR, file), "utf8");
+        const entry = JSON.parse(raw) as { url: string; html: string; ts: number };
+        if (
+          entry &&
+          typeof entry.url === "string" &&
+          typeof entry.html === "string" &&
+          typeof entry.ts === "number" &&
+          Number.isFinite(entry.ts)
+        ) {
+          if (now - entry.ts < CONTENT_DISK_TTL) {
+            contentCache.set(entry.url, { html: entry.html, ts: entry.ts });
+            loaded++;
+          } else {
+            fs.unlink(path.join(CONTENT_DISK_CACHE_DIR, file), () => {});
+          }
+        }
+      } catch {
+        // corrupt file — skip
+      }
+    }
+    if (loaded > 0) {
+      logger.info({ loaded }, "blog: content cache pre-warmed from disk");
+    }
+  } catch (err) {
+    logger.warn({ err }, "blog: failed to load content disk cache");
+  }
+}
+
+function saveContentToDisk(url: string, html: string, ts: number): void {
+  try {
+    fs.mkdirSync(CONTENT_DISK_CACHE_DIR, { recursive: true });
+    fs.writeFileSync(contentDiskCachePath(url), JSON.stringify({ url, html, ts }), "utf8");
+  } catch {
+    // fire-and-forget, ignore write errors
+  }
+}
+
 const SITEMAP_CACHE_TTL = 10 * 60 * 1000;
 let _sitemapCache: { urls: string[]; ts: number } | null = null;
 
@@ -143,20 +202,23 @@ function extractArticleHtml(pageHtml: string): string {
 }
 
 async function fetchPostContent(url: string): Promise<string> {
+  const now = Date.now();
   const cached = contentCache.get(url);
-  if (cached && Date.now() - cached.ts < CONTENT_TTL) return cached.html;
+  if (cached && now - cached.ts < CONTENT_TTL) return cached.html;
   try {
     const res = await fetch(url, {
       headers: { "User-Agent": "aklman-mobile/1.0" },
       signal: AbortSignal.timeout(8000),
     });
-    if (!res.ok) return "";
+    if (!res.ok) return cached?.html ?? "";
     const html = await res.text();
     const extracted = extractArticleHtml(html);
-    contentCache.set(url, { html: extracted, ts: Date.now() });
+    const ts = Date.now();
+    contentCache.set(url, { html: extracted, ts });
+    saveContentToDisk(url, extracted, ts);
     return extracted;
   } catch {
-    return "";
+    return cached?.html ?? "";
   }
 }
 
@@ -746,6 +808,7 @@ router.get("/search", async (req, res) => {
 });
 
 loadDiskCache();
+loadContentCacheFromDisk();
 loadMetadataDiskCache().then(() => warmCache()).catch(() => warmCache());
 
 export default router;
