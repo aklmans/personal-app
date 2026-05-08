@@ -526,6 +526,27 @@ function buildHtml(
     var badge = document.createElement('span');
     badge.className = 'lang-badge';
     badge.textContent = lang;
+    badge.dataset.langLabel = lang;
+    badge.addEventListener('click', function() {
+      if (badge.dataset.copying === '1') return;
+      var code = pre.querySelector('code');
+      var text = code ? (code.textContent || '') : (pre.textContent || '');
+      if (!navigator.clipboard) return;
+      badge.dataset.copying = '1';
+      navigator.clipboard.writeText(text).then(function() {
+        badge.textContent = 'Copied \u2713';
+        badge.style.color = '#22c55e';
+        badge.style.borderColor = '#22c55e';
+        setTimeout(function() {
+          badge.textContent = badge.dataset.langLabel || '';
+          badge.style.color = '';
+          badge.style.borderColor = '';
+          badge.dataset.copying = '';
+        }, 1500);
+      }).catch(function() {
+        badge.dataset.copying = '';
+      });
+    });
     pre.appendChild(badge);
   }
   function wrapCode(pre) {
@@ -695,11 +716,12 @@ function buildHtml(
       padding: 2px 6px;
       text-transform: uppercase;
       letter-spacing: 0.5px;
-      pointer-events: none;
+      cursor: pointer;
       user-select: none;
       line-height: 1.4;
       opacity: 0.85;
       z-index: 2;
+      transition: color 0.15s, border-color 0.15s;
     }
     code[class*="language-"], pre[class*="language-"] > code {
       background: transparent !important;
