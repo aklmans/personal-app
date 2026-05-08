@@ -1,0 +1,105 @@
+你是一个资深前端工程师。请在 Replit 中复现并继续开发 aklman-blog 的手机版博客体验。
+
+项目背景：
+这是 aklman.com 博客的 Astro 重建项目，目标是 warm、editorial、calm、generous whitespace、subtle motion、premium typography 的个人博客。请优先保持现有项目风格，而不是重新设计成普通模板站。
+
+技术栈必须保持：
+- Astro 6
+- Tailwind CSS 4 via Vite plugin
+- Astro Content Collections
+- Markdown frontmatter
+- Pagefind 搜索
+- RSS / sitemap
+- Node.js >= 22.12.0
+- 静态优先，少用客户端 JavaScript
+
+重要限制：
+- 不要重建项目，不要换框架，不要引入 React/Vue/Svelte 状态管理。
+- 不要删除现有路由、内容集合、RSS、搜索、评论、SEO、暗色模式。
+- 不要破坏双语结构：英文默认路由，中文普通页面在 `/zh-cn` 下；文章详情中文路径目前是 `/posts/<slug>/zh-cn`。
+- 不做复杂应用化改造，重点打磨移动端阅读、导航、列表和内容浏览体验。
+- 保留现有视觉系统：暖米色背景、terra cotta 强调色、低对比边框、编辑感字体、安静留白。
+- 移动端不能产生横向滚动或内容溢出。
+
+开始前请先阅读这些文件：
+- `AGENTS.md`
+- `README.md`
+- `docs/project-overview.md`
+- `docs/mobile-regression.md`
+- `package.json`
+- `src/styles/global.css`
+- `src/layouts/Layout.astro`
+- `src/components/Header.astro`
+- `src/components/Footer.astro`
+- `src/components/PostListCard.astro`
+- `src/pages/index.astro`
+- `src/pages/posts/[...slug].astro`
+
+移动端重点页面：
+- `/`
+- `/zh-cn/`
+- `/posts`
+- `/zh-cn/posts`
+- `/posts/<slug>`
+- `/posts/<slug>/zh-cn`
+- `/categories`
+- `/tags`
+- `/series`
+- `/archives`
+- `/search`
+- `/navigation`
+- `/showcases`
+- `/about`
+
+移动端设计要求：
+1. 以 360px、375px、390px、430px 宽度为核心验收尺寸。
+2. Header 保持 sticky，不遮挡正文。
+3. 桌面导航在移动端折叠为清晰的菜单；菜单可打开、关闭，支持 Escape 和点击外部关闭。
+4. 首页首屏要像个人编辑博客，不要像营销 landing page。
+5. 文章详情页优先阅读体验：标题、摘要、meta、封面、正文、代码块、标签、相关文章、评论区都不能横向溢出。
+6. 文章页移动端隐藏侧边目录，正文宽度占满可用空间。
+7. 代码块必须横向滚动，不撑破页面。
+8. 列表页卡片移动端单列，缩略图使用稳定比例，标题和标签自然换行。
+9. 分类、标签、系列按钮不能挤压或溢出。
+10. Footer 在窄屏下保持清晰分组，工具按钮、RSS、语言切换、主题切换不能重叠。
+11. 中文页面不要使用不合适的英文压缩字距，保持中文排版自然。
+12. 支持亮色和暗色主题，移动端 theme-color 也要合理。
+
+视觉 token 方向：
+- 背景：`#f7f3ed` / `#fffaf5`
+- 文本：`#1d1b18`
+- 次级文本：`#62584e`
+- 强调色：`#da7756` / `#c86341`
+- 圆角克制，卡片不超过现有 token 风格
+- 字体遵循现有 `--font-serif`、`--font-sans`、`--font-cjk-sans`、`--font-cjk-serif`
+
+实现方式：
+- 优先修改现有组件和 CSS，不新增重复组件。
+- 优先使用已有工具函数：`src/utils/url.ts`、`src/utils/i18n.ts`、taxonomy helper。
+- 样式尽量放在对应 Astro 组件内；全局 token 或通用规则再放 `src/styles/global.css`。
+- 保持低 JS，只在移动菜单、主题、搜索、文章操作等必要交互中使用。
+- 每次改动尽量小而独立。
+
+验收命令：
+请最终运行：
+
+```bash
+npm run format:check
+npm run check
+npm run build
+npm run search:check
+npm run mobile:check
+如果可以，最后运行：
+npm run validate
+交付结果：
+•
+说明你修改了哪些文件。
+•
+说明移动端体验具体改进了什么。
+•
+说明哪些命令已通过。
+•
+如果有无法验证的地方，请明确列出原因。
+你也可以在开头再加一句硬约束，防止 Replit Agent 跑偏：
+
+```text
