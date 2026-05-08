@@ -21,6 +21,7 @@ import type {
   HealthStatus,
   ListBlogCategoriesParams,
   ListBlogPostsParams,
+  ListBlogSeriesParams,
   ListBlogTagsParams,
   SearchBlogPostsParams,
 } from "./api.schemas";
@@ -494,6 +495,100 @@ export function useListBlogTags<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getListBlogTagsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List blog series
+ */
+export const getListBlogSeriesUrl = (params?: ListBlogSeriesParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/blog/series?${stringifiedParams}`
+    : `/api/blog/series`;
+};
+
+export const listBlogSeries = async (
+  params?: ListBlogSeriesParams,
+  options?: RequestInit,
+): Promise<BlogTaxonomy[]> => {
+  return customFetch<BlogTaxonomy[]>(getListBlogSeriesUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListBlogSeriesQueryKey = (params?: ListBlogSeriesParams) => {
+  return [`/api/blog/series`, ...(params ? [params] : [])] as const;
+};
+
+export const getListBlogSeriesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listBlogSeries>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListBlogSeriesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listBlogSeries>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListBlogSeriesQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listBlogSeries>>> = ({
+    signal,
+  }) => listBlogSeries(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listBlogSeries>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListBlogSeriesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listBlogSeries>>
+>;
+export type ListBlogSeriesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List blog series
+ */
+
+export function useListBlogSeries<
+  TData = Awaited<ReturnType<typeof listBlogSeries>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListBlogSeriesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listBlogSeries>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListBlogSeriesQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

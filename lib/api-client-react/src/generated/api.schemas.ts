@@ -20,6 +20,8 @@ export interface BlogPost {
   tags: string[];
   readingTime?: number | null;
   locale: string;
+  content?: string | null;
+  series?: string | null;
 }
 
 export interface BlogTaxonomy {
@@ -36,6 +38,7 @@ export type ListBlogPostsParams = {
   locale?: ListBlogPostsLocale;
   category?: string;
   tag?: string;
+  series?: string;
 };
 
 export type ListBlogPostsLocale =
@@ -78,6 +81,18 @@ export type ListBlogTagsLocale =
   (typeof ListBlogTagsLocale)[keyof typeof ListBlogTagsLocale];
 
 export const ListBlogTagsLocale = {
+  en: "en",
+  "zh-cn": "zh-cn",
+} as const;
+
+export type ListBlogSeriesParams = {
+  locale?: ListBlogSeriesLocale;
+};
+
+export type ListBlogSeriesLocale =
+  (typeof ListBlogSeriesLocale)[keyof typeof ListBlogSeriesLocale];
+
+export const ListBlogSeriesLocale = {
   en: "en",
   "zh-cn": "zh-cn",
 } as const;

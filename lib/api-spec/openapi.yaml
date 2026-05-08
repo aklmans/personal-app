@@ -50,6 +50,11 @@ paths:
           required: false
           schema:
             type: string
+        - name: series
+          in: query
+          required: false
+          schema:
+            type: string
       responses:
         "200":
           description: List of blog posts
@@ -134,6 +139,28 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/BlogTaxonomy"
+  /blog/series:
+    get:
+      operationId: listBlogSeries
+      tags: [blog]
+      summary: List blog series
+      parameters:
+        - name: locale
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [en, zh-cn]
+            default: en
+      responses:
+        "200":
+          description: List of series
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BlogTaxonomy"
   /blog/search:
     get:
       operationId: searchBlogPosts
@@ -199,6 +226,12 @@ components:
           nullable: true
         locale:
           type: string
+        content:
+          type: string
+          nullable: true
+        series:
+          type: string
+          nullable: true
       required:
         - slug
         - title

@@ -65,10 +65,19 @@ function StackNav() {
       />
       <Stack.Screen
         name="archives"
-        options={{
-          title: "Archives",
-          headerBackTitle: "Back",
-        }}
+        options={{ title: "Archives", headerBackTitle: "Back" }}
+      />
+      <Stack.Screen
+        name="series/[slug]"
+        options={{ title: "Series", headerBackTitle: "Back" }}
+      />
+      <Stack.Screen
+        name="about"
+        options={{ title: "About", headerBackTitle: "Back" }}
+      />
+      <Stack.Screen
+        name="showcases"
+        options={{ title: "Showcases", headerBackTitle: "Back" }}
       />
     </Stack>
   );

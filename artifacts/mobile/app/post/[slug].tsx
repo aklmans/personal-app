@@ -1,12 +1,13 @@
 import { Feather } from "@expo/vector-icons";
 import { useGetBlogPost } from "@workspace/api-client-react";
 import * as WebBrowser from "expo-web-browser";
-import { useLocalSearchParams, useNavigation } from "expo-router";
-import React, { useEffect, useMemo } from "react";
+import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
+import React, { useEffect, useMemo, useRef } from "react";
 import {
   ActivityIndicator,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -17,6 +18,15 @@ import WebView from "react-native-webview";
 import { fonts } from "@/constants/fonts";
 import { useColors } from "@/hooks/useColors";
 import { useTheme } from "@/context/ThemeContext";
+import { useLanguage } from "@/context/LanguageContext";
+
+interface RelatedPost {
+  slug: string;
+  title: string;
+  description: string;
+  pubDate: string;
+  categories: string[];
+}
 
 interface PostWithContent {
   slug: string;
@@ -28,11 +38,18 @@ interface PostWithContent {
   categories: string[];
   tags: string[];
   readingTime?: number | null;
-  content: string;
+  content?: string | null;
   locale: string;
+  series?: string | null;
+  seriesSlug?: string | null;
+  related?: RelatedPost[];
 }
 
-function buildHtml(content: string, colors: ReturnType<typeof useColors>, isDark: boolean): string {
+function buildHtml(
+  content: string,
+  colors: ReturnType<typeof useColors>,
+  isDark: boolean
+): string {
   const bg = colors.background;
   const text = colors.text;
   const primary = colors.primary;
@@ -143,10 +160,12 @@ export default function PostDetailScreen() {
   const isDark = resolved === "dark";
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
+  const router = useRouter();
   const { slug, locale } = useLocalSearchParams<{
     slug: string;
     locale: string;
   }>();
+  const { isZh } = useLanguage();
 
   const safeLocale = (locale === "zh-cn" ? "zh-cn" : "en") as "en" | "zh-cn";
 
@@ -178,13 +197,7 @@ export default function PostDetailScreen() {
 
   if (isLoading) {
     return (
-      <View
-        style={[
-          styles.root,
-          styles.center,
-          { backgroundColor: colors.background },
-        ]}
-      >
+      <View style={[styles.root, styles.center, { backgroundColor: colors.background }]}>
         <ActivityIndicator color={colors.primary} size="large" />
       </View>
     );
@@ -192,21 +205,17 @@ export default function PostDetailScreen() {
 
   if (isError || !post) {
     return (
-      <View
-        style={[styles.root, styles.center, { backgroundColor: colors.background }]}
-      >
+      <View style={[styles.root, styles.center, { backgroundColor: colors.background }]}>
         <Feather name="alert-circle" size={36} color={colors.mutedForeground} />
-        <Text
-          style={[
-            styles.errorText,
-            { color: colors.mutedForeground, fontFamily: fonts.sans.regular },
-          ]}
-        >
+        <Text style={[styles.errorText, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}>
           Post not found
         </Text>
       </View>
     );
   }
+
+  const tags = post.tags ?? [];
+  const related = post.related ?? [];
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
@@ -229,11 +238,86 @@ export default function PostDetailScreen() {
           originWhitelist={["*"]}
           scrollEnabled
           showsVerticalScrollIndicator={false}
-          contentInset={{ bottom: bottomPad }}
           javaScriptEnabled={false}
           domStorageEnabled={false}
           allowsInlineMediaPlayback={false}
         />
+      )}
+
+      {(tags.length > 0 || related.length > 0) && (
+        <View
+          style={[
+            styles.metaSection,
+            { backgroundColor: colors.background, borderTopColor: colors.border },
+          ]}
+        >
+          {tags.length > 0 && (
+            <View style={styles.tagsRow}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tagsScroll}>
+                {tags.map((tag) => (
+                  <Pressable
+                    key={tag}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/tag/[slug]",
+                        params: {
+                          slug: tag.toLowerCase().replace(/\s+/g, "-"),
+                          locale: safeLocale,
+                        },
+                      })
+                    }
+                    style={[styles.tagChip, { backgroundColor: colors.secondary, borderColor: colors.border }]}
+                  >
+                    <Text style={[styles.tagChipText, { color: colors.primary, fontFamily: fonts.sans.medium }]}>
+                      #{tag}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
+          {related.length > 0 && (
+            <View style={[styles.relatedSection, { borderTopColor: colors.border }]}>
+              <Text style={[styles.relatedLabel, { color: colors.mutedForeground, fontFamily: fonts.sans.semiBold }]}>
+                {isZh ? "相关文章" : "RELATED POSTS"}
+              </Text>
+              {related.map((rp) => (
+                <Pressable
+                  key={rp.slug}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/post/[slug]",
+                      params: { slug: rp.slug, locale: safeLocale },
+                    })
+                  }
+                  style={({ pressed }) => [
+                    styles.relatedRow,
+                    {
+                      backgroundColor: pressed ? colors.secondary : colors.card,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                >
+                  <View style={styles.relatedContent}>
+                    <Text
+                      style={[styles.relatedTitle, { color: colors.text, fontFamily: fonts.serif.regular }]}
+                      numberOfLines={2}
+                    >
+                      {rp.title}
+                    </Text>
+                    {rp.categories.length > 0 && (
+                      <Text style={[styles.relatedCat, { color: colors.primary, fontFamily: fonts.sans.regular }]}>
+                        {rp.categories[0]}
+                      </Text>
+                    )}
+                  </View>
+                  <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+                </Pressable>
+              ))}
+            </View>
+          )}
+        </View>
       )}
 
       <View
@@ -253,10 +337,8 @@ export default function PostDetailScreen() {
             { backgroundColor: pressed ? "#c05540" : colors.primary },
           ]}
         >
-          <Text
-            style={[styles.openBtnText, { fontFamily: fonts.sans.semiBold }]}
-          >
-            Open on aklman.com
+          <Text style={[styles.openBtnText, { fontFamily: fonts.sans.semiBold }]}>
+            {isZh ? "在 aklman.com 上阅读" : "Open on aklman.com"}
           </Text>
           <Feather name="external-link" size={15} color="#ffffff" />
         </Pressable>
@@ -266,17 +348,50 @@ export default function PostDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
+  root: { flex: 1 },
+  center: { alignItems: "center", justifyContent: "center", gap: 12 },
+  webview: { flex: 1 },
+  metaSection: {
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
-  center: {
+  tagsRow: {
+    paddingVertical: 10,
+  },
+  tagsScroll: {
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  tagChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  tagChipText: { fontSize: 13 },
+  relatedSection: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: 12,
+    paddingHorizontal: 16,
+    paddingBottom: 4,
+  },
+  relatedLabel: {
+    fontSize: 11,
+    letterSpacing: 1.2,
+    marginBottom: 8,
+  },
+  relatedRow: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginBottom: 6,
+    gap: 8,
   },
-  webview: {
-    flex: 1,
-  },
+  relatedContent: { flex: 1 },
+  relatedTitle: { fontSize: 14, lineHeight: 20, marginBottom: 2 },
+  relatedCat: { fontSize: 12 },
   footer: {
     paddingHorizontal: 20,
     paddingTop: 12,
@@ -292,12 +407,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginBottom: 4,
   },
-  openBtnText: {
-    color: "#ffffff",
-    fontSize: 15,
-  },
-  errorText: {
-    fontSize: 16,
-    marginTop: 8,
-  },
+  openBtnText: { color: "#ffffff", fontSize: 15 },
+  errorText: { fontSize: 16, marginTop: 8 },
 });

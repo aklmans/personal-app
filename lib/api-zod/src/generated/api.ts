@@ -25,6 +25,7 @@ export const ListBlogPostsQueryParams = zod.object({
   locale: zod.enum(["en", "zh-cn"]).default(listBlogPostsQueryLocaleDefault),
   category: zod.coerce.string().optional(),
   tag: zod.coerce.string().optional(),
+  series: zod.coerce.string().optional(),
 });
 
 export const ListBlogPostsResponseItem = zod.object({
@@ -38,6 +39,8 @@ export const ListBlogPostsResponseItem = zod.object({
   tags: zod.array(zod.string()),
   readingTime: zod.number().nullish(),
   locale: zod.string(),
+  content: zod.string().nullish(),
+  series: zod.string().nullish(),
 });
 export const ListBlogPostsResponse = zod.array(ListBlogPostsResponseItem);
 
@@ -65,6 +68,8 @@ export const GetBlogPostResponse = zod.object({
   tags: zod.array(zod.string()),
   readingTime: zod.number().nullish(),
   locale: zod.string(),
+  content: zod.string().nullish(),
+  series: zod.string().nullish(),
 });
 
 /**
@@ -104,6 +109,22 @@ export const ListBlogTagsResponseItem = zod.object({
 export const ListBlogTagsResponse = zod.array(ListBlogTagsResponseItem);
 
 /**
+ * @summary List blog series
+ */
+export const listBlogSeriesQueryLocaleDefault = `en`;
+
+export const ListBlogSeriesQueryParams = zod.object({
+  locale: zod.enum(["en", "zh-cn"]).default(listBlogSeriesQueryLocaleDefault),
+});
+
+export const ListBlogSeriesResponseItem = zod.object({
+  slug: zod.string(),
+  name: zod.string(),
+  count: zod.number(),
+});
+export const ListBlogSeriesResponse = zod.array(ListBlogSeriesResponseItem);
+
+/**
  * @summary Search blog posts
  */
 export const searchBlogPostsQueryLocaleDefault = `en`;
@@ -124,5 +145,7 @@ export const SearchBlogPostsResponseItem = zod.object({
   tags: zod.array(zod.string()),
   readingTime: zod.number().nullish(),
   locale: zod.string(),
+  content: zod.string().nullish(),
+  series: zod.string().nullish(),
 });
 export const SearchBlogPostsResponse = zod.array(SearchBlogPostsResponseItem);

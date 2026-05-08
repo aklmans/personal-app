@@ -64,16 +64,23 @@ export default function MoreScreen() {
       onPress: () => router.push("/archives"),
     },
     {
+      icon: "layers",
+      label: "Series",
+      labelZh: "系列",
+      onPress: () =>
+        router.push({ pathname: "/series/[slug]", params: { slug: "all" } }),
+    },
+    {
       icon: "star",
       label: "Showcases",
       labelZh: "作品集",
-      onPress: () => openUrl("https://aklman.com/showcases"),
+      onPress: () => router.push("/showcases"),
     },
     {
       icon: "user",
       label: "About",
       labelZh: "关于",
-      onPress: () => openUrl("https://aklman.com/about"),
+      onPress: () => router.push("/about"),
     },
     {
       icon: "rss",

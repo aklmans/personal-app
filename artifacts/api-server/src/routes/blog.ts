@@ -20,6 +20,8 @@ interface BlogPost {
   readingTime: number | null;
   locale: string;
   content: string;
+  series: string | null;
+  seriesSlug: string | null;
 }
 
 interface BlogTaxonomy {
@@ -77,8 +79,23 @@ function slugify(str: string): string {
 }
 
 function extractSlugFromUrl(url: string): string {
+  // Use first path segment after /posts/ as slug (series path)
   const match = url.match(/\/posts\/([^/?#]+)/);
   return match ? match[1] : slugify(url);
+}
+
+function extractSeriesFromUrl(url: string): { seriesSlug: string | null; seriesName: string | null } {
+  // Pattern: /posts/{seriesSlug}/{postSlug}/
+  const match = url.match(/\/posts\/([^/?#]+)\/([^/?#]+)/);
+  if (match) {
+    const seriesSlug = match[1];
+    const seriesName = seriesSlug
+      .split("-")
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ");
+    return { seriesSlug, seriesName };
+  }
+  return { seriesSlug: null, seriesName: null };
 }
 
 function extractCoverImage(content: string): string | null {
@@ -159,6 +176,7 @@ async function fetchFeed(locale: string): Promise<BlogPost[]> {
       const slug = extractSlugFromUrl(link);
       const coverImage = extractCoverImage(content);
       const readingTime = content ? estimateReadingTime(content) : null;
+      const { seriesSlug, seriesName } = extractSeriesFromUrl(link);
 
       return {
         slug,
@@ -172,6 +190,8 @@ async function fetchFeed(locale: string): Promise<BlogPost[]> {
         readingTime,
         locale,
         content,
+        series: seriesName,
+        seriesSlug,
       };
     });
 
@@ -208,6 +228,11 @@ router.get("/posts", async (req, res) => {
       );
     }
 
+    const series = req.query["series"] as string | undefined;
+    if (series) {
+      posts = posts.filter((p) => p.seriesSlug === series);
+    }
+
     res.json(posts);
   } catch {
     res.status(500).json({ error: "Failed to fetch posts" });
@@ -231,7 +256,19 @@ router.get("/posts/:slug", async (req, res) => {
       articleContent = await fetchPostContent(post.link);
     }
 
-    res.json({ ...post, content: articleContent });
+    // Related posts: same series or overlapping categories, exclude self
+    const allPosts = await fetchFeed(locale);
+    const related = allPosts
+      .filter((p) => p.slug !== post.slug)
+      .filter(
+        (p) =>
+          (post.seriesSlug && p.seriesSlug === post.seriesSlug) ||
+          p.categories.some((c) => post.categories.includes(c)) ||
+          p.tags.some((t) => post.tags.includes(t))
+      )
+      .slice(0, 3);
+
+    res.json({ ...post, content: articleContent, related });
   } catch {
     res.status(500).json({ error: "Failed to fetch post" });
   }
@@ -278,6 +315,30 @@ router.get("/tags", async (req, res) => {
     res.json(tags);
   } catch {
     res.status(500).json({ error: "Failed to fetch tags" });
+  }
+});
+
+router.get("/series", async (req, res) => {
+  try {
+    const locale = (req.query["locale"] as string) || "en";
+    const posts = await fetchFeed(locale);
+
+    const counts = new Map<string, { name: string; count: number }>();
+    for (const post of posts) {
+      if (post.seriesSlug && post.series) {
+        const entry = counts.get(post.seriesSlug) ?? { name: post.series, count: 0 };
+        entry.count++;
+        counts.set(post.seriesSlug, entry);
+      }
+    }
+
+    const series: BlogTaxonomy[] = Array.from(counts.entries())
+      .map(([slug, { name, count }]) => ({ slug, name, count }))
+      .sort((a, b) => b.count - a.count);
+
+    res.json(series);
+  } catch {
+    res.status(500).json({ error: "Failed to fetch series" });
   }
 });
 
