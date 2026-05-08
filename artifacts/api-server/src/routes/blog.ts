@@ -141,8 +141,8 @@ function loadContentCacheFromDisk(): void {
             fs.unlink(path.join(CONTENT_DISK_CACHE_DIR, file), () => {});
           }
         }
-      } catch {
-        // corrupt file — skip
+      } catch (fileErr) {
+        logger.warn({ file, err: fileErr }, "blog: skipping corrupt content cache file");
       }
     }
     if (loaded > 0) {
@@ -213,7 +213,10 @@ async function fetchPostContent(url: string): Promise<string> {
       headers: { "User-Agent": "aklman-mobile/1.0" },
       signal: AbortSignal.timeout(8000),
     });
-    if (!res.ok) return cached?.html ?? "";
+    if (!res.ok) {
+      if (cached) contentCache.set(url, { html: cached.html, ts: now });
+      return cached?.html ?? "";
+    }
     const html = await res.text();
     const extracted = extractArticleHtml(html);
     const ts = Date.now();
@@ -221,6 +224,7 @@ async function fetchPostContent(url: string): Promise<string> {
     saveContentToDisk(url, extracted, ts);
     return extracted;
   } catch {
+    if (cached) contentCache.set(url, { html: cached.html, ts: now });
     return cached?.html ?? "";
   }
 }
