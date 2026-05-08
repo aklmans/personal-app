@@ -557,6 +557,17 @@ function buildHtml(
     wrapper.appendChild(pre);
     return wrapper;
   }
+  function addLineNumbers(wrapper, lineCount) {
+    if (!wrapper || lineCount <= 1) return;
+    if (wrapper.querySelector('.line-gutter')) return;
+    wrapper.classList.add('has-gutter');
+    var gutter = document.createElement('div');
+    gutter.className = 'line-gutter';
+    var html = '';
+    for (var n = 1; n <= lineCount; n++) { html += '<span>' + n + '</span>'; }
+    gutter.innerHTML = html;
+    wrapper.insertBefore(gutter, wrapper.querySelector('pre'));
+  }
   function updateScrollable(wrapper) {
     if (!wrapper || !wrapper.classList || !wrapper.classList.contains('code-wrapper')) return;
     var pre = wrapper.querySelector('pre');
@@ -590,6 +601,8 @@ function buildHtml(
     code.textContent = rawText;
     addLangBadge(pre, lang);
     var wrapper = wrapCode(pre);
+    var lineCount = rawText ? rawText.split('\n').length : 1;
+    addLineNumbers(wrapper, lineCount);
     updateScrollable(wrapper);
     pre.addEventListener('scroll', function() {
       var w = this.parentNode;
@@ -613,6 +626,8 @@ function buildHtml(
         var pre = env.element.parentNode;
         addLangBadge(pre, env.language);
         var wrapper = wrapCode(pre);
+        var prismText = env.element ? (env.element.textContent || '') : '';
+        addLineNumbers(wrapper, prismText ? prismText.split('\n').length : 1);
         updateScrollable(wrapper);
       }
     });
@@ -673,6 +688,40 @@ function buildHtml(
     .code-wrapper {
       position: relative;
       margin: 1.4em 0;
+    }
+    .code-wrapper.has-gutter {
+      display: flex;
+      align-items: stretch;
+    }
+    .line-gutter {
+      flex-shrink: 0;
+      width: 36px;
+      padding: 16px 0 16px 0;
+      display: flex;
+      flex-direction: column;
+      background: ${codeBg};
+      border-right: 1px solid ${border};
+      border-radius: 10px 0 0 10px;
+      user-select: none;
+      -webkit-user-select: none;
+      box-sizing: border-box;
+    }
+    .line-gutter span {
+      display: block;
+      text-align: right;
+      padding-right: 8px;
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 11px;
+      color: ${muted};
+      opacity: 0.5;
+      line-height: ${14 * 1.6}px;
+    }
+    .code-wrapper.has-gutter > pre,
+    .code-wrapper.has-gutter > pre[class*="language-"] {
+      flex: 1;
+      min-width: 0;
+      border-radius: 0 10px 10px 0;
+      padding-left: 12px;
     }
     .code-wrapper::after {
       content: '';
@@ -1006,6 +1055,11 @@ export default function PostDetailScreen() {
     };
   }, []);
 
+  const scrollStorageKey = useMemo(
+    () => (post ? `${SCROLL_KEY_PREFIX}${post.locale}:${post.slug}` : null),
+    [post]
+  );
+
   useEffect(() => {
     const unsubscribe = navigation.addListener("blur", () => {
       if (!scrollStorageKey) return;
@@ -1043,11 +1097,6 @@ export default function PostDetailScreen() {
         ? buildHtml(post.content ?? "", colors, isDark, fontSize, lineSpacing, contentWidth, fontFamily)
         : "",
     [post, colors, isDark, fontSize, lineSpacing, contentWidth, fontFamily]
-  );
-
-  const scrollStorageKey = useMemo(
-    () => (post ? `${SCROLL_KEY_PREFIX}${post.locale}:${post.slug}` : null),
-    [post]
   );
 
   const onWebViewMessage = useCallback(
