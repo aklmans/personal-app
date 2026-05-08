@@ -21,6 +21,7 @@ import { fonts } from "@/constants/fonts";
 import { useColors } from "@/hooks/useColors";
 import { useTheme } from "@/context/ThemeContext";
 import { useLanguage } from "@/context/LanguageContext";
+import { useReadingPrefs } from "@/hooks/useReadingPrefs";
 
 function PostHeaderTitle({
   title,
@@ -60,6 +61,64 @@ const headerTitleStyles = StyleSheet.create({
   fill: { height: "100%", borderRadius: 1 },
 });
 
+function FontSizeControls({
+  onDecrease,
+  onIncrease,
+  canDecrease,
+  canIncrease,
+  primaryColor,
+  mutedColor,
+}: {
+  onDecrease: () => void;
+  onIncrease: () => void;
+  canDecrease: boolean;
+  canIncrease: boolean;
+  primaryColor: string;
+  mutedColor: string;
+}) {
+  return (
+    <View style={fontCtrlStyles.row}>
+      <Pressable
+        onPress={onDecrease}
+        disabled={!canDecrease}
+        hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}
+        style={({ pressed }) => [
+          fontCtrlStyles.btn,
+          { opacity: pressed ? 0.5 : 1 },
+        ]}
+        accessibilityLabel="Decrease font size"
+        accessibilityRole="button"
+      >
+        <Text style={[fontCtrlStyles.aSmall, { color: canDecrease ? primaryColor : mutedColor }]}>
+          A
+        </Text>
+      </Pressable>
+      <Pressable
+        onPress={onIncrease}
+        disabled={!canIncrease}
+        hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}
+        style={({ pressed }) => [
+          fontCtrlStyles.btn,
+          { opacity: pressed ? 0.5 : 1 },
+        ]}
+        accessibilityLabel="Increase font size"
+        accessibilityRole="button"
+      >
+        <Text style={[fontCtrlStyles.aLarge, { color: canIncrease ? primaryColor : mutedColor }]}>
+          A
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
+const fontCtrlStyles = StyleSheet.create({
+  row: { flexDirection: "row", alignItems: "center", gap: 2, marginRight: 4 },
+  btn: { paddingHorizontal: 6, paddingVertical: 4 },
+  aSmall: { fontSize: 13, fontFamily: "Lora_400Regular", fontWeight: "600" },
+  aLarge: { fontSize: 19, fontFamily: "Lora_700Bold", fontWeight: "700", lineHeight: 22 },
+});
+
 interface PostWithContent {
   slug: string;
   title: string;
@@ -77,8 +136,9 @@ interface PostWithContent {
   related?: RelatedPost[];
 }
 
-const SCROLL_JS = `
-(function() {
+function buildInjectedJS(fontSize: number): string {
+  return `(function() {
+  document.documentElement.style.setProperty('font-size', '${fontSize}px', 'important');
   function send() {
     var el = document.documentElement;
     var top = el.scrollTop || document.body.scrollTop || 0;
@@ -92,8 +152,8 @@ const SCROLL_JS = `
   window.addEventListener('load', send);
   send();
 })();
-true;
-`;
+true;`;
+}
 
 function buildHtml(
   content: string,
@@ -233,10 +293,12 @@ export default function PostDetailScreen() {
     locale: string;
   }>();
   const { isZh } = useLanguage();
+  const { fontSize, canIncrease, canDecrease, increase, decrease } = useReadingPrefs();
 
   const safeLocale = (locale === "zh-cn" ? "zh-cn" : "en") as "en" | "zh-cn";
 
   const progressAnim = useRef(new Animated.Value(0)).current;
+  const webViewRef = useRef<WebView>(null);
 
   const { data, isLoading, isError } = useGetBlogPost(
     slug ?? "",
@@ -247,20 +309,49 @@ export default function PostDetailScreen() {
   const post = data as PostWithContent | undefined;
 
   useEffect(() => {
-    if (post?.title) {
-      navigation.setOptions({
-        headerTitle: () => (
-          <PostHeaderTitle
-            title={post.title}
-            progressAnim={progressAnim}
-            primaryColor={colors.primary}
-            borderColor={colors.border}
-            textColor={colors.text}
-          />
-        ),
-      });
+    navigation.setOptions({
+      ...(post?.title
+        ? {
+            headerTitle: () => (
+              <PostHeaderTitle
+                title={post.title}
+                progressAnim={progressAnim}
+                primaryColor={colors.primary}
+                borderColor={colors.border}
+                textColor={colors.text}
+              />
+            ),
+          }
+        : {}),
+      headerRight: () => (
+        <FontSizeControls
+          onDecrease={decrease}
+          onIncrease={increase}
+          canDecrease={canDecrease}
+          canIncrease={canIncrease}
+          primaryColor={colors.primary}
+          mutedColor={colors.mutedForeground}
+        />
+      ),
+    });
+  }, [
+    post,
+    navigation,
+    progressAnim,
+    colors,
+    decrease,
+    increase,
+    canDecrease,
+    canIncrease,
+  ]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web" && webViewRef.current) {
+      webViewRef.current.injectJavaScript(
+        `document.documentElement.style.setProperty('font-size','${fontSize}px','important');true;`
+      );
     }
-  }, [post, navigation, progressAnim, colors]);
+  }, [fontSize]);
 
   const htmlContent = useMemo(
     () => (post ? buildHtml(post.content ?? "", colors, isDark) : ""),
@@ -292,9 +383,7 @@ export default function PostDetailScreen() {
 
   if (isLoading) {
     return (
-      <View
-        style={[styles.root, styles.center, { backgroundColor: colors.background }]}
-      >
+      <View style={[styles.root, styles.center, { backgroundColor: colors.background }]}>
         <ActivityIndicator color={colors.primary} size="large" />
       </View>
     );
@@ -302,9 +391,7 @@ export default function PostDetailScreen() {
 
   if (isError || !post) {
     return (
-      <View
-        style={[styles.root, styles.center, { backgroundColor: colors.background }]}
-      >
+      <View style={[styles.root, styles.center, { backgroundColor: colors.background }]}>
         <Feather name="alert-circle" size={36} color={colors.mutedForeground} />
         <Text
           style={[
@@ -337,6 +424,7 @@ export default function PostDetailScreen() {
         />
       ) : (
         <WebView
+          ref={webViewRef}
           source={{ html: htmlContent, baseUrl: post.link }}
           style={[styles.webview, { backgroundColor: colors.background }]}
           originWhitelist={["*"]}
@@ -345,7 +433,7 @@ export default function PostDetailScreen() {
           javaScriptEnabled
           domStorageEnabled={false}
           allowsInlineMediaPlayback={false}
-          injectedJavaScript={SCROLL_JS}
+          injectedJavaScript={buildInjectedJS(fontSize)}
           onMessage={onWebViewMessage}
         />
       )}
@@ -354,10 +442,7 @@ export default function PostDetailScreen() {
         <View
           style={[
             styles.metaSection,
-            {
-              backgroundColor: colors.background,
-              borderTopColor: colors.border,
-            },
+            { backgroundColor: colors.background, borderTopColor: colors.border },
           ]}
         >
           {tags.length > 0 && (
@@ -381,19 +466,13 @@ export default function PostDetailScreen() {
                     }
                     style={[
                       styles.tagChip,
-                      {
-                        backgroundColor: colors.secondary,
-                        borderColor: colors.border,
-                      },
+                      { backgroundColor: colors.secondary, borderColor: colors.border },
                     ]}
                   >
                     <Text
                       style={[
                         styles.tagChipText,
-                        {
-                          color: colors.primary,
-                          fontFamily: fonts.sans.medium,
-                        },
+                        { color: colors.primary, fontFamily: fonts.sans.medium },
                       ]}
                     >
                       #{tag}
@@ -405,19 +484,11 @@ export default function PostDetailScreen() {
           )}
 
           {related.length > 0 && (
-            <View
-              style={[
-                styles.relatedSection,
-                { borderTopColor: colors.border },
-              ]}
-            >
+            <View style={[styles.relatedSection, { borderTopColor: colors.border }]}>
               <Text
                 style={[
                   styles.relatedLabel,
-                  {
-                    color: colors.mutedForeground,
-                    fontFamily: fonts.sans.semiBold,
-                  },
+                  { color: colors.mutedForeground, fontFamily: fonts.sans.semiBold },
                 ]}
               >
                 {isZh ? "相关文章" : "RELATED POSTS"}
@@ -434,9 +505,7 @@ export default function PostDetailScreen() {
                   style={({ pressed }) => [
                     styles.relatedRow,
                     {
-                      backgroundColor: pressed
-                        ? colors.secondary
-                        : colors.card,
+                      backgroundColor: pressed ? colors.secondary : colors.card,
                       borderColor: colors.border,
                     },
                   ]}
@@ -445,10 +514,7 @@ export default function PostDetailScreen() {
                     <Text
                       style={[
                         styles.relatedTitle,
-                        {
-                          color: colors.text,
-                          fontFamily: fonts.serif.regular,
-                        },
+                        { color: colors.text, fontFamily: fonts.serif.regular },
                       ]}
                       numberOfLines={2}
                     >
@@ -458,21 +524,14 @@ export default function PostDetailScreen() {
                       <Text
                         style={[
                           styles.relatedCat,
-                          {
-                            color: colors.primary,
-                            fontFamily: fonts.sans.regular,
-                          },
+                          { color: colors.primary, fontFamily: fonts.sans.regular },
                         ]}
                       >
                         {rp.categories[0]}
                       </Text>
                     )}
                   </View>
-                  <Feather
-                    name="chevron-right"
-                    size={16}
-                    color={colors.mutedForeground}
-                  />
+                  <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
                 </Pressable>
               ))}
             </View>
@@ -497,12 +556,7 @@ export default function PostDetailScreen() {
             { backgroundColor: pressed ? "#c05540" : colors.primary },
           ]}
         >
-          <Text
-            style={[
-              styles.openBtnText,
-              { fontFamily: fonts.sans.semiBold },
-            ]}
-          >
+          <Text style={[styles.openBtnText, { fontFamily: fonts.sans.semiBold }]}>
             {isZh ? "在 aklman.com 上阅读" : "Open on aklman.com"}
           </Text>
           <Feather name="external-link" size={15} color="#ffffff" />
