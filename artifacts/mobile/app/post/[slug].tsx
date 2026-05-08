@@ -3,8 +3,9 @@ import { useGetBlogPost } from "@workspace/api-client-react";
 import type { RelatedPost } from "@workspace/api-client-react";
 import * as WebBrowser from "expo-web-browser";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import {
+  Animated,
   ActivityIndicator,
   Platform,
   Pressable,
@@ -38,6 +39,24 @@ interface PostWithContent {
   related?: RelatedPost[];
 }
 
+const SCROLL_JS = `
+(function() {
+  function send() {
+    var el = document.documentElement;
+    var top = el.scrollTop || document.body.scrollTop || 0;
+    var total = (el.scrollHeight || document.body.scrollHeight) - (el.clientHeight || window.innerHeight);
+    var p = total <= 0 ? 1 : top / total;
+    if (window.ReactNativeWebView) {
+      window.ReactNativeWebView.postMessage(JSON.stringify({ t: 'scroll', p: Math.min(1, Math.max(0, p)) }));
+    }
+  }
+  window.addEventListener('scroll', send, { passive: true });
+  window.addEventListener('load', send);
+  send();
+})();
+true;
+`;
+
 function buildHtml(
   content: string,
   colors: ReturnType<typeof useColors>,
@@ -55,63 +74,75 @@ function buildHtml(
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=4.0">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+  <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500&display=swap" rel="stylesheet">
   <style>
     * { box-sizing: border-box; }
     html { font-size: 17px; -webkit-text-size-adjust: 100%; }
     body {
-      margin: 0; padding: 0 20px 40px;
+      margin: 0; padding: 0 20px 48px;
       background-color: ${bg};
       color: ${text};
-      font-family: Georgia, 'Times New Roman', serif;
-      line-height: 1.75;
+      font-family: 'Lora', Georgia, 'Times New Roman', serif;
+      line-height: 1.85;
       max-width: 100%;
       word-wrap: break-word;
       overflow-x: hidden;
     }
     h1, h2, h3, h4, h5, h6 {
-      font-family: Georgia, serif;
+      font-family: 'Lora', Georgia, serif;
+      font-weight: 700;
       color: ${text};
       line-height: 1.3;
       margin-top: 1.8em;
       margin-bottom: 0.5em;
     }
     h1 { font-size: 1.6em; }
-    h2 { font-size: 1.35em; }
+    h2 { font-size: 1.35em; border-bottom: 1px solid ${border}; padding-bottom: 0.25em; }
     h3 { font-size: 1.15em; }
     a { color: ${primary}; text-decoration: none; }
     a:hover { text-decoration: underline; }
-    p { margin: 0 0 1.2em; }
-    img { max-width: 100%; height: auto; border-radius: 6px; display: block; margin: 1em auto; }
+    p { margin: 0 0 1.25em; }
+    img { max-width: 100%; height: auto; border-radius: 8px; display: block; margin: 1.2em auto; }
     figure { margin: 1.5em 0; }
-    figcaption { font-size: 0.85em; color: ${muted}; text-align: center; margin-top: 0.4em; }
+    figcaption {
+      font-size: 0.82em;
+      font-family: 'Inter', system-ui, sans-serif;
+      color: ${muted};
+      text-align: center;
+      margin-top: 0.4em;
+    }
     pre {
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
       background: ${codeBg};
-      border-radius: 8px;
-      padding: 14px 16px;
-      margin: 1.2em 0;
+      border-radius: 10px;
+      padding: 16px 18px;
+      margin: 1.4em 0;
       font-size: 14px;
+      line-height: 1.6;
     }
     code {
-      font-family: 'Menlo', 'Courier New', monospace;
+      font-family: 'Menlo', 'SF Mono', 'Courier New', monospace;
       font-size: 14px;
     }
     pre code {
       background: none;
       padding: 0;
       font-size: inherit;
+      line-height: inherit;
     }
     :not(pre) > code {
       background: ${codeBg};
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-size: 0.88em;
+      padding: 2px 7px;
+      border-radius: 5px;
+      font-size: 0.87em;
     }
     blockquote {
       border-left: 3px solid ${primary};
-      margin: 1.2em 0;
-      padding: 4px 0 4px 16px;
+      margin: 1.4em 0;
+      padding: 6px 0 6px 18px;
       color: ${muted};
       font-style: italic;
     }
@@ -119,28 +150,33 @@ function buildHtml(
     hr {
       border: 0;
       border-top: 1px solid ${border};
-      margin: 2em 0;
+      margin: 2.2em 0;
     }
     table {
       width: 100%;
       overflow-x: auto;
       display: block;
       border-collapse: collapse;
-      margin: 1.2em 0;
+      margin: 1.4em 0;
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 0.9em;
     }
     th, td {
       padding: 8px 12px;
       border: 1px solid ${border};
       text-align: left;
-      font-size: 0.9em;
     }
     th { background: ${codeBg}; font-weight: 600; }
-    ul, ol { padding-left: 1.6em; margin: 0.8em 0 1.2em; }
-    li { margin-bottom: 0.4em; }
+    ul, ol { padding-left: 1.7em; margin: 0.8em 0 1.25em; }
+    li { margin-bottom: 0.45em; }
     .astro-code, .shiki {
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
     }
+    strong { font-weight: 700; }
+    em { font-style: italic; }
+    mark { background: rgba(218,119,86,0.18); padding: 1px 3px; border-radius: 3px; }
+    sup, sub { font-size: 0.75em; }
   </style>
 </head>
 <body>${content || "<p>No content available for this article. Tap the button below to read it in full.</p>"}</body>
@@ -162,6 +198,8 @@ export default function PostDetailScreen() {
 
   const safeLocale = (locale === "zh-cn" ? "zh-cn" : "en") as "en" | "zh-cn";
 
+  const progressAnim = useRef(new Animated.Value(0)).current;
+
   const { data, isLoading, isError } = useGetBlogPost(
     slug ?? "",
     { locale: safeLocale },
@@ -181,6 +219,22 @@ export default function PostDetailScreen() {
     [post, colors, isDark]
   );
 
+  const onWebViewMessage = useCallback(
+    (event: { nativeEvent: { data: string } }) => {
+      try {
+        const msg = JSON.parse(event.nativeEvent.data);
+        if (msg.t === "scroll" && typeof msg.p === "number") {
+          Animated.timing(progressAnim, {
+            toValue: msg.p,
+            duration: 80,
+            useNativeDriver: false,
+          }).start();
+        }
+      } catch {}
+    },
+    [progressAnim]
+  );
+
   const openInBrowser = async () => {
     if (!post?.link) return;
     await WebBrowser.openBrowserAsync(post.link);
@@ -190,7 +244,9 @@ export default function PostDetailScreen() {
 
   if (isLoading) {
     return (
-      <View style={[styles.root, styles.center, { backgroundColor: colors.background }]}>
+      <View
+        style={[styles.root, styles.center, { backgroundColor: colors.background }]}
+      >
         <ActivityIndicator color={colors.primary} size="large" />
       </View>
     );
@@ -198,9 +254,16 @@ export default function PostDetailScreen() {
 
   if (isError || !post) {
     return (
-      <View style={[styles.root, styles.center, { backgroundColor: colors.background }]}>
+      <View
+        style={[styles.root, styles.center, { backgroundColor: colors.background }]}
+      >
         <Feather name="alert-circle" size={36} color={colors.mutedForeground} />
-        <Text style={[styles.errorText, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}>
+        <Text
+          style={[
+            styles.errorText,
+            { color: colors.mutedForeground, fontFamily: fonts.sans.regular },
+          ]}
+        >
           Post not found
         </Text>
       </View>
@@ -210,8 +273,25 @@ export default function PostDetailScreen() {
   const tags = post.tags ?? [];
   const related = post.related ?? [];
 
+  const progressWidth = progressAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0%", "100%"],
+  });
+
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
+      <View
+        style={[styles.progressTrack, { backgroundColor: colors.border }]}
+        pointerEvents="none"
+      >
+        <Animated.View
+          style={[
+            styles.progressFill,
+            { backgroundColor: colors.primary, width: progressWidth },
+          ]}
+        />
+      </View>
+
       {Platform.OS === "web" ? (
         <iframe
           srcDoc={htmlContent}
@@ -231,9 +311,11 @@ export default function PostDetailScreen() {
           originWhitelist={["*"]}
           scrollEnabled
           showsVerticalScrollIndicator={false}
-          javaScriptEnabled={false}
+          javaScriptEnabled
           domStorageEnabled={false}
           allowsInlineMediaPlayback={false}
+          injectedJavaScript={SCROLL_JS}
+          onMessage={onWebViewMessage}
         />
       )}
 
@@ -241,12 +323,19 @@ export default function PostDetailScreen() {
         <View
           style={[
             styles.metaSection,
-            { backgroundColor: colors.background, borderTopColor: colors.border },
+            {
+              backgroundColor: colors.background,
+              borderTopColor: colors.border,
+            },
           ]}
         >
           {tags.length > 0 && (
             <View style={styles.tagsRow}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tagsScroll}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.tagsScroll}
+              >
                 {tags.map((tag) => (
                   <Pressable
                     key={tag}
@@ -259,9 +348,23 @@ export default function PostDetailScreen() {
                         },
                       })
                     }
-                    style={[styles.tagChip, { backgroundColor: colors.secondary, borderColor: colors.border }]}
+                    style={[
+                      styles.tagChip,
+                      {
+                        backgroundColor: colors.secondary,
+                        borderColor: colors.border,
+                      },
+                    ]}
                   >
-                    <Text style={[styles.tagChipText, { color: colors.primary, fontFamily: fonts.sans.medium }]}>
+                    <Text
+                      style={[
+                        styles.tagChipText,
+                        {
+                          color: colors.primary,
+                          fontFamily: fonts.sans.medium,
+                        },
+                      ]}
+                    >
                       #{tag}
                     </Text>
                   </Pressable>
@@ -271,8 +374,21 @@ export default function PostDetailScreen() {
           )}
 
           {related.length > 0 && (
-            <View style={[styles.relatedSection, { borderTopColor: colors.border }]}>
-              <Text style={[styles.relatedLabel, { color: colors.mutedForeground, fontFamily: fonts.sans.semiBold }]}>
+            <View
+              style={[
+                styles.relatedSection,
+                { borderTopColor: colors.border },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.relatedLabel,
+                  {
+                    color: colors.mutedForeground,
+                    fontFamily: fonts.sans.semiBold,
+                  },
+                ]}
+              >
                 {isZh ? "相关文章" : "RELATED POSTS"}
               </Text>
               {related.map((rp) => (
@@ -287,25 +403,45 @@ export default function PostDetailScreen() {
                   style={({ pressed }) => [
                     styles.relatedRow,
                     {
-                      backgroundColor: pressed ? colors.secondary : colors.card,
+                      backgroundColor: pressed
+                        ? colors.secondary
+                        : colors.card,
                       borderColor: colors.border,
                     },
                   ]}
                 >
                   <View style={styles.relatedContent}>
                     <Text
-                      style={[styles.relatedTitle, { color: colors.text, fontFamily: fonts.serif.regular }]}
+                      style={[
+                        styles.relatedTitle,
+                        {
+                          color: colors.text,
+                          fontFamily: fonts.serif.regular,
+                        },
+                      ]}
                       numberOfLines={2}
                     >
                       {rp.title}
                     </Text>
                     {rp.categories.length > 0 && (
-                      <Text style={[styles.relatedCat, { color: colors.primary, fontFamily: fonts.sans.regular }]}>
+                      <Text
+                        style={[
+                          styles.relatedCat,
+                          {
+                            color: colors.primary,
+                            fontFamily: fonts.sans.regular,
+                          },
+                        ]}
+                      >
                         {rp.categories[0]}
                       </Text>
                     )}
                   </View>
-                  <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+                  <Feather
+                    name="chevron-right"
+                    size={16}
+                    color={colors.mutedForeground}
+                  />
                 </Pressable>
               ))}
             </View>
@@ -330,7 +466,12 @@ export default function PostDetailScreen() {
             { backgroundColor: pressed ? "#c05540" : colors.primary },
           ]}
         >
-          <Text style={[styles.openBtnText, { fontFamily: fonts.sans.semiBold }]}>
+          <Text
+            style={[
+              styles.openBtnText,
+              { fontFamily: fonts.sans.semiBold },
+            ]}
+          >
             {isZh ? "在 aklman.com 上阅读" : "Open on aklman.com"}
           </Text>
           <Feather name="external-link" size={15} color="#ffffff" />
@@ -343,6 +484,15 @@ export default function PostDetailScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   center: { alignItems: "center", justifyContent: "center", gap: 12 },
+  progressTrack: {
+    height: 3,
+    width: "100%",
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    borderRadius: 2,
+  },
   webview: { flex: 1 },
   metaSection: {
     borderTopWidth: StyleSheet.hairlineWidth,
