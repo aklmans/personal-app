@@ -852,7 +852,7 @@ export default function PostDetailScreen() {
   const {
     fontSize, canIncrease, canDecrease, increase, decrease,
     lineSpacing, setLineSpacing, contentWidth, setContentWidth,
-    fontFamily, setFontFamily,
+    fontFamily, setFontFamily, hydrated,
   } = useReadingPrefs();
   const [sheetVisible, setSheetVisible] = useState(false);
   const { isBookmarked, toggleBookmark } = useBookmarks();
@@ -1175,18 +1175,22 @@ export default function PostDetailScreen() {
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       {Platform.OS === "web" ? (
-        <iframe
-          srcDoc={webHtmlContent}
-          style={{
-            flex: 1,
-            border: "none",
-            width: "100%",
-            height: "100%",
-            backgroundColor: colors.background,
-          } as React.CSSProperties}
-          title={post.title}
-        />
-      ) : (
+        hydrated ? (
+          <iframe
+            srcDoc={webHtmlContent}
+            style={{
+              flex: 1,
+              border: "none",
+              width: "100%",
+              height: "100%",
+              backgroundColor: colors.background,
+            } as React.CSSProperties}
+            title={post.title}
+          />
+        ) : (
+          <View style={{ flex: 1, backgroundColor: colors.background }} />
+        )
+      ) : hydrated ? (
         <WebView
           ref={webViewRef}
           source={{ html: htmlContent, baseUrl: post.link }}
@@ -1201,6 +1205,8 @@ export default function PostDetailScreen() {
           onMessage={onWebViewMessage}
           onLoadEnd={() => { restoreScrollPosition(); }}
         />
+      ) : (
+        <View style={[styles.webview, { backgroundColor: colors.background }]} />
       )}
 
       {(tags.length > 0 || related.length > 0) && (

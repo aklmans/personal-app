@@ -40,6 +40,7 @@ export interface ReadingPrefs {
   setContentWidth: (v: ContentWidth) => void;
   fontFamily: FontFamily;
   setFontFamily: (v: FontFamily) => void;
+  hydrated: boolean;
 }
 
 const defaultPrefs: ReadingPrefs = {
@@ -54,6 +55,7 @@ const defaultPrefs: ReadingPrefs = {
   setContentWidth: () => {},
   fontFamily: FONT_FAMILY_DEFAULT,
   setFontFamily: () => {},
+  hydrated: false,
 };
 
 const ReadingPrefsContext = createContext<ReadingPrefs>(defaultPrefs);
@@ -73,6 +75,7 @@ export function ReadingPrefsProvider({
   const [fontFamily, setFontFamilyState] = useState<FontFamily>(
     FONT_FAMILY_DEFAULT
   );
+  const [hydrated, setHydrated] = useState(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -81,26 +84,31 @@ export function ReadingPrefsProvider({
       AsyncStorage.getItem(LINE_SPACING_KEY),
       AsyncStorage.getItem(CONTENT_WIDTH_KEY),
       AsyncStorage.getItem(FONT_FAMILY_KEY),
-    ]).then(([storedSize, storedSpacing, storedWidth, storedFamily]) => {
-      if (storedSize !== null) {
-        const parsed = parseInt(storedSize, 10);
-        if (!isNaN(parsed) && parsed >= FONT_SIZE_MIN && parsed <= FONT_SIZE_MAX) {
-          setFontSizeState(parsed);
+    ])
+      .then(([storedSize, storedSpacing, storedWidth, storedFamily]) => {
+        if (storedSize !== null) {
+          const parsed = parseInt(storedSize, 10);
+          if (!isNaN(parsed) && parsed >= FONT_SIZE_MIN && parsed <= FONT_SIZE_MAX) {
+            setFontSizeState(parsed);
+          }
         }
-      }
-      if (storedSpacing !== null) {
-        const parsed = parseFloat(storedSpacing);
-        if (parsed === 1.6 || parsed === 1.85 || parsed === 2.1) {
-          setLineSpacingState(parsed as LineSpacing);
+        if (storedSpacing !== null) {
+          const parsed = parseFloat(storedSpacing);
+          if (parsed === 1.6 || parsed === 1.85 || parsed === 2.1) {
+            setLineSpacingState(parsed as LineSpacing);
+          }
         }
-      }
-      if (storedWidth === "full" || storedWidth === "narrow") {
-        setContentWidthState(storedWidth);
-      }
-      if (storedFamily === "serif" || storedFamily === "sans") {
-        setFontFamilyState(storedFamily);
-      }
-    });
+        if (storedWidth === "full" || storedWidth === "narrow") {
+          setContentWidthState(storedWidth);
+        }
+        if (storedFamily === "serif" || storedFamily === "sans") {
+          setFontFamilyState(storedFamily);
+        }
+        setHydrated(true);
+      })
+      .catch(() => {
+        setHydrated(true);
+      });
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
@@ -155,6 +163,7 @@ export function ReadingPrefsProvider({
     setContentWidth,
     fontFamily,
     setFontFamily,
+    hydrated,
   };
 
   return (
