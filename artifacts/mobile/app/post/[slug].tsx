@@ -3,10 +3,11 @@ import { useGetBlogPost, queryOpts } from "@workspace/api-client-react";
 import type { RelatedPost } from "@workspace/api-client-react";
 import * as WebBrowser from "expo-web-browser";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
-import React, { useCallback, useEffect, useMemo, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   ActivityIndicator,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -23,7 +24,12 @@ import { useHistory } from "@/context/HistoryContext";
 import { useColors } from "@/hooks/useColors";
 import { useTheme } from "@/context/ThemeContext";
 import { useLanguage } from "@/context/LanguageContext";
-import { useReadingPrefs } from "@/hooks/useReadingPrefs";
+import {
+  useReadingPrefs,
+  type LineSpacing,
+  type ContentWidth,
+  LINE_SPACING_PRESETS,
+} from "@/hooks/useReadingPrefs";
 
 function PostHeaderTitle({
   title,
@@ -121,6 +127,227 @@ const fontCtrlStyles = StyleSheet.create({
   aLarge: { fontSize: 19, fontFamily: "Lora_700Bold", fontWeight: "700", lineHeight: 22 },
 });
 
+const SPACING_OPTS: { value: LineSpacing; label: string; labelZh: string }[] = [
+  { value: 1.6, label: "Compact", labelZh: "紧凑" },
+  { value: 1.85, label: "Default", labelZh: "默认" },
+  { value: 2.1, label: "Relaxed", labelZh: "宽松" },
+];
+
+const WIDTH_OPTS: {
+  value: ContentWidth;
+  label: string;
+  labelZh: string;
+  icon: keyof typeof Feather.glyphMap;
+}[] = [
+  { value: "full", label: "Full Width", labelZh: "全宽", icon: "maximize-2" },
+  { value: "narrow", label: "Narrow", labelZh: "窄列", icon: "minimize-2" },
+];
+
+function ReadingPrefsSheet({
+  visible,
+  onClose,
+  lineSpacing,
+  setLineSpacing,
+  contentWidth,
+  setContentWidth,
+  isZh,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  lineSpacing: LineSpacing;
+  setLineSpacing: (v: LineSpacing) => void;
+  contentWidth: ContentWidth;
+  setContentWidth: (v: ContentWidth) => void;
+  isZh: boolean;
+}) {
+  const colors = useColors();
+  const insets = useSafeAreaInsets();
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+      statusBarTranslucent
+    >
+      <Pressable style={sheetStyles.backdrop} onPress={onClose} />
+      <View
+        style={[
+          sheetStyles.sheet,
+          {
+            backgroundColor: colors.card,
+            borderColor: colors.border,
+            paddingBottom: Math.max(insets.bottom, 20) + 8,
+          },
+        ]}
+      >
+        <View style={[sheetStyles.handle, { backgroundColor: colors.border }]} />
+
+        <View style={sheetStyles.sheetHeader}>
+          <Text
+            style={[
+              sheetStyles.sheetTitle,
+              { color: colors.text, fontFamily: fonts.sans.semiBold },
+            ]}
+          >
+            {isZh ? "阅读设置" : "Reading Preferences"}
+          </Text>
+          <Pressable
+            onPress={onClose}
+            hitSlop={10}
+            accessibilityLabel="Close"
+            accessibilityRole="button"
+          >
+            <Feather name="x" size={20} color={colors.mutedForeground} />
+          </Pressable>
+        </View>
+
+        <Text
+          style={[
+            sheetStyles.sectionLabel,
+            { color: colors.mutedForeground, fontFamily: fonts.sans.semiBold },
+          ]}
+        >
+          {isZh ? "行距" : "LINE SPACING"}
+        </Text>
+        <View style={sheetStyles.optRow}>
+          {SPACING_OPTS.map((opt) => {
+            const active = lineSpacing === opt.value;
+            return (
+              <Pressable
+                key={opt.value}
+                onPress={() => setLineSpacing(opt.value)}
+                style={({ pressed }) => [
+                  sheetStyles.optBtn,
+                  {
+                    backgroundColor: active ? colors.primary : colors.secondary,
+                    borderColor: active ? colors.primary : colors.border,
+                    opacity: pressed ? 0.72 : 1,
+                  },
+                ]}
+                accessibilityLabel={opt.label}
+                accessibilityRole="button"
+              >
+                <Text
+                  style={[
+                    sheetStyles.optLabel,
+                    {
+                      color: active ? "#fff" : colors.text,
+                      fontFamily: fonts.sans.regular,
+                    },
+                  ]}
+                >
+                  {isZh ? opt.labelZh : opt.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <Text
+          style={[
+            sheetStyles.sectionLabel,
+            {
+              color: colors.mutedForeground,
+              fontFamily: fonts.sans.semiBold,
+              marginTop: 18,
+            },
+          ]}
+        >
+          {isZh ? "内容宽度" : "CONTENT WIDTH"}
+        </Text>
+        <View style={sheetStyles.optRow}>
+          {WIDTH_OPTS.map((opt) => {
+            const active = contentWidth === opt.value;
+            return (
+              <Pressable
+                key={opt.value}
+                onPress={() => setContentWidth(opt.value)}
+                style={({ pressed }) => [
+                  sheetStyles.optBtn,
+                  {
+                    backgroundColor: active ? colors.primary : colors.secondary,
+                    borderColor: active ? colors.primary : colors.border,
+                    opacity: pressed ? 0.72 : 1,
+                  },
+                ]}
+                accessibilityLabel={opt.label}
+                accessibilityRole="button"
+              >
+                <Feather
+                  name={opt.icon}
+                  size={13}
+                  color={active ? "#fff" : colors.text}
+                />
+                <Text
+                  style={[
+                    sheetStyles.optLabel,
+                    {
+                      color: active ? "#fff" : colors.text,
+                      fontFamily: fonts.sans.regular,
+                    },
+                  ]}
+                >
+                  {isZh ? opt.labelZh : opt.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const sheetStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+  },
+  sheet: {
+    paddingTop: 10,
+    paddingHorizontal: 20,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderLeftWidth: StyleSheet.hairlineWidth,
+    borderRightWidth: StyleSheet.hairlineWidth,
+    elevation: 16,
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: -4 },
+  },
+  handle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: "center",
+    marginBottom: 14,
+  },
+  sheetHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  sheetTitle: { fontSize: 16 },
+  sectionLabel: { fontSize: 11, letterSpacing: 1.1, marginBottom: 10 },
+  optRow: { flexDirection: "row", gap: 8 },
+  optBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  optLabel: { fontSize: 13 },
+});
+
 interface PostWithContent {
   slug: string;
   title: string;
@@ -138,9 +365,21 @@ interface PostWithContent {
   related?: RelatedPost[];
 }
 
-function buildInjectedJS(fontSize: number): string {
+function buildInjectedJS(
+  fontSize: number,
+  lineSpacing: number,
+  contentWidth: ContentWidth
+): string {
+  const maxW = contentWidth === "narrow" ? "680px" : "100%";
+  const padH = contentWidth === "narrow" ? "24px" : "20px";
   return `(function() {
   document.documentElement.style.setProperty('font-size', '${fontSize}px', 'important');
+  document.body.style.lineHeight = '${lineSpacing}';
+  document.body.style.maxWidth = '${maxW}';
+  document.body.style.paddingLeft = '${padH}';
+  document.body.style.paddingRight = '${padH}';
+  document.body.style.marginLeft = 'auto';
+  document.body.style.marginRight = 'auto';
   function send() {
     var el = document.documentElement;
     var top = el.scrollTop || document.body.scrollTop || 0;
@@ -161,7 +400,9 @@ function buildHtml(
   content: string,
   colors: ReturnType<typeof useColors>,
   isDark: boolean,
-  fontSize = 17
+  fontSize = 17,
+  lineSpacing = 1.85,
+  contentWidth: ContentWidth = "full"
 ): string {
   const bg = colors.background;
   const text = colors.text;
@@ -169,6 +410,8 @@ function buildHtml(
   const muted = colors.mutedForeground;
   const codeBg = isDark ? "#2e2825" : "#ede8e0";
   const border = colors.border;
+  const bodyMaxWidth = contentWidth === "narrow" ? "680px" : "100%";
+  const padH = contentWidth === "narrow" ? "24px" : "20px";
 
   const prismCssUrl = isDark
     ? "https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css"
@@ -227,12 +470,12 @@ function buildHtml(
     * { box-sizing: border-box; }
     html { font-size: ${fontSize}px; -webkit-text-size-adjust: 100%; }
     body {
-      margin: 0; padding: 0 20px 48px;
+      margin: 0 auto; padding: 0 ${padH} 48px;
       background-color: ${bg};
       color: ${text};
       font-family: 'Lora', Georgia, 'Times New Roman', serif;
-      line-height: 1.85;
-      max-width: 100%;
+      line-height: ${lineSpacing};
+      max-width: ${bodyMaxWidth};
       word-wrap: break-word;
       overflow-x: hidden;
     }
@@ -347,7 +590,11 @@ export default function PostDetailScreen() {
     locale: string;
   }>();
   const { isZh } = useLanguage();
-  const { fontSize, canIncrease, canDecrease, increase, decrease } = useReadingPrefs();
+  const {
+    fontSize, canIncrease, canDecrease, increase, decrease,
+    lineSpacing, setLineSpacing, contentWidth, setContentWidth,
+  } = useReadingPrefs();
+  const [sheetVisible, setSheetVisible] = useState(false);
   const { isBookmarked, toggleBookmark } = useBookmarks();
   const { recordVisit } = useHistory();
 
@@ -384,6 +631,19 @@ export default function PostDetailScreen() {
         const bookmarked = post ? isBookmarked(post.slug, post.locale) : false;
         return (
           <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+            <Pressable
+              onPress={() => setSheetVisible(true)}
+              hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+              style={({ pressed }) => ({
+                opacity: pressed ? 0.5 : 1,
+                paddingHorizontal: 6,
+                paddingVertical: 4,
+              })}
+              accessibilityLabel="Reading preferences"
+              accessibilityRole="button"
+            >
+              <Feather name="sliders" size={18} color={colors.mutedForeground} />
+            </Pressable>
             {post && (
               <Pressable
                 onPress={() => {
@@ -435,6 +695,7 @@ export default function PostDetailScreen() {
     canIncrease,
     isBookmarked,
     toggleBookmark,
+    setSheetVisible,
   ]);
 
   useEffect(() => {
@@ -463,14 +724,35 @@ export default function PostDetailScreen() {
     }
   }, [fontSize]);
 
+  useEffect(() => {
+    if (Platform.OS !== "web" && webViewRef.current) {
+      webViewRef.current.injectJavaScript(
+        `document.body.style.lineHeight='${lineSpacing}';true;`
+      );
+    }
+  }, [lineSpacing]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web" && webViewRef.current) {
+      const maxW = contentWidth === "narrow" ? "680px" : "100%";
+      const padH = contentWidth === "narrow" ? "24px" : "20px";
+      webViewRef.current.injectJavaScript(
+        `document.body.style.maxWidth='${maxW}';document.body.style.paddingLeft='${padH}';document.body.style.paddingRight='${padH}';document.body.style.marginLeft='auto';document.body.style.marginRight='auto';true;`
+      );
+    }
+  }, [contentWidth]);
+
   const htmlContent = useMemo(
     () => (post ? buildHtml(post.content ?? "", colors, isDark) : ""),
     [post, colors, isDark]
   );
 
   const webHtmlContent = useMemo(
-    () => (post ? buildHtml(post.content ?? "", colors, isDark, fontSize) : ""),
-    [post, colors, isDark, fontSize]
+    () =>
+      post
+        ? buildHtml(post.content ?? "", colors, isDark, fontSize, lineSpacing, contentWidth)
+        : "",
+    [post, colors, isDark, fontSize, lineSpacing, contentWidth]
   );
 
   const onWebViewMessage = useCallback(
@@ -548,7 +830,7 @@ export default function PostDetailScreen() {
           javaScriptEnabled
           domStorageEnabled={false}
           allowsInlineMediaPlayback={false}
-          injectedJavaScript={buildInjectedJS(fontSize)}
+          injectedJavaScript={buildInjectedJS(fontSize, lineSpacing, contentWidth)}
           onMessage={onWebViewMessage}
         />
       )}
@@ -677,6 +959,16 @@ export default function PostDetailScreen() {
           <Feather name="external-link" size={15} color="#ffffff" />
         </Pressable>
       </View>
+
+      <ReadingPrefsSheet
+        visible={sheetVisible}
+        onClose={() => setSheetVisible(false)}
+        lineSpacing={lineSpacing}
+        setLineSpacing={setLineSpacing}
+        contentWidth={contentWidth}
+        setContentWidth={setContentWidth}
+        isZh={isZh}
+      />
     </View>
   );
 }
