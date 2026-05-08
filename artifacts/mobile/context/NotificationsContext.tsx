@@ -113,7 +113,24 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY)
       .then((val) => {
-        if (val === "true") setOptedIn(true);
+        if (val === "true") {
+          setOptedIn(true);
+          if (Platform.OS !== "web") {
+            Promise.all([
+              AsyncStorage.getItem(STORAGE_TOKEN_KEY),
+              getPushToken(),
+            ])
+              .then(async ([storedToken, currentToken]) => {
+                if (!currentToken) return;
+                if (storedToken && storedToken !== currentToken) {
+                  await unregisterToken(storedToken);
+                  await AsyncStorage.setItem(STORAGE_TOKEN_KEY, currentToken);
+                }
+                await registerToken(currentToken);
+              })
+              .catch(() => {});
+          }
+        }
       })
       .catch(() => {});
 

@@ -150,13 +150,14 @@ async function fetchRssPostSlugs(locale: string): Promise<{ slug: string; title:
 
 async function sendExpoPushNotifications(messages: object[]): Promise<void> {
   if (messages.length === 0) return;
+  let tokensInvalidated = false;
   try {
     const chunks: object[][] = [];
     for (let i = 0; i < messages.length; i += 100) {
       chunks.push(messages.slice(i, i + 100));
     }
     for (const chunk of chunks) {
-      await fetch(EXPO_PUSH_URL, {
+      const res = await fetch(EXPO_PUSH_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -165,9 +166,34 @@ async function sendExpoPushNotifications(messages: object[]): Promise<void> {
         body: JSON.stringify(chunk),
         signal: AbortSignal.timeout(15000),
       });
+      if (res.ok) {
+        const body = await res.json() as {
+          data?: Array<{ status: string; details?: { error?: string } }>;
+        };
+        if (Array.isArray(body.data)) {
+          const tokensInChunk = (chunk as Array<{ to: string }>).map((m) => m.to);
+          body.data.forEach((result, i) => {
+            if (
+              result.status === "error" &&
+              (result.details?.error === "DeviceNotRegistered" ||
+                result.details?.error === "InvalidCredentials")
+            ) {
+              const token = tokensInChunk[i];
+              if (token && registeredTokens.has(token)) {
+                registeredTokens.delete(token);
+                tokensInvalidated = true;
+                logger.info({ tokenPrefix: token.slice(0, 16) }, "Removed invalid push token");
+              }
+            }
+          });
+        }
+      }
     }
   } catch (err) {
     logger.error({ err }, "Failed to send Expo push notifications");
+  }
+  if (tokensInvalidated) {
+    saveTokensToDisk().catch(() => {});
   }
 }
 
