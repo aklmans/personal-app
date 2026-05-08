@@ -49,9 +49,9 @@ export default function HomeScreen() {
 
   const handlePostPress = useCallback(
     (post: PostData) => {
-      router.push({ pathname: "/post/[slug]", params: { slug: post.slug, locale } });
+      router.push({ pathname: "/post/[slug]", params: { slug: post.slug, locale: post.locale } });
     },
-    [router, locale]
+    [router]
   );
 
   const topPad =
