@@ -10,6 +10,7 @@ import React, {
 } from "react";
 import { Platform } from "react-native";
 import { useRouter } from "expo-router";
+import { useLanguage } from "./LanguageContext";
 
 const STORAGE_KEY = "@notifications_opted_in_v1";
 const STORAGE_TOKEN_KEY = "@notifications_push_token_v1";
@@ -54,12 +55,12 @@ async function ensureAndroidChannel(): Promise<void> {
   });
 }
 
-async function registerToken(token: string): Promise<boolean> {
+async function registerToken(token: string, locale: string): Promise<boolean> {
   try {
     const res = await fetch(`${API_BASE}/notifications/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token }),
+      body: JSON.stringify({ token, locale }),
     });
     return res.ok;
   } catch {
@@ -107,6 +108,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   const [permissionStatus, setPermissionStatus] = useState<"undetermined" | "granted" | "denied">("undetermined");
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const { locale } = useLanguage();
   const notificationResponseListener = useRef<Notifications.EventSubscription | null>(null);
   const coldStartHandled = useRef(false);
 
@@ -122,7 +124,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
             ])
               .then(async ([storedToken, currentToken]) => {
                 if (!currentToken) return;
-                const registered = await registerToken(currentToken);
+                const registered = await registerToken(currentToken, locale);
                 if (registered && storedToken && storedToken !== currentToken) {
                   await unregisterToken(storedToken);
                   await AsyncStorage.setItem(STORAGE_TOKEN_KEY, currentToken);
@@ -176,7 +178,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     return () => {
       notificationResponseListener.current?.remove();
     };
-  }, [router]);
+  }, [router, locale]);
 
   const enable = useCallback(async () => {
     if (Platform.OS === "web") return;
@@ -198,7 +200,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
         return;
       }
 
-      const registered = await registerToken(token);
+      const registered = await registerToken(token, locale);
       if (!registered) {
         return;
       }
@@ -211,7 +213,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [locale]);
 
   const disable = useCallback(async () => {
     setIsLoading(true);

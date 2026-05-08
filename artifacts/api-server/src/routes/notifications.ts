@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { createReadStream, createWriteStream, existsSync } from "fs";
-import { readFile, writeFile } from "fs/promises";
+import { existsSync } from "fs";
+import { readFile, writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 import { logger } from "../lib/logger";
 
@@ -19,7 +19,9 @@ const POLL_INTERVAL_MS = 10 * 60 * 1000;
 
 const TOKENS_FILE = join(process.cwd(), "data", "push-tokens.json");
 
-const registeredTokens = new Set<string>();
+type TokenRecord = { token: string; locale: string };
+
+const registeredTokens = new Map<string, string>();
 
 const knownPostSlugs = new Set<string>();
 let initialized = false;
@@ -29,14 +31,19 @@ const SITEMAP_CACHE_TTL = 10 * 60 * 1000;
 
 async function loadTokensFromDisk(): Promise<void> {
   try {
-    const { mkdir } = await import("fs/promises");
     await mkdir(join(process.cwd(), "data"), { recursive: true });
     if (!existsSync(TOKENS_FILE)) return;
     const raw = await readFile(TOKENS_FILE, "utf-8");
-    const parsed = JSON.parse(raw) as string[];
+    const parsed = JSON.parse(raw) as unknown;
+
     if (Array.isArray(parsed)) {
-      for (const t of parsed) {
-        if (typeof t === "string") registeredTokens.add(t);
+      for (const item of parsed) {
+        if (typeof item === "string") {
+          registeredTokens.set(item, "en");
+        } else if (item && typeof item === "object" && typeof (item as TokenRecord).token === "string") {
+          const r = item as TokenRecord;
+          registeredTokens.set(r.token, r.locale ?? "en");
+        }
       }
       logger.info({ count: registeredTokens.size }, "Loaded push tokens from disk");
     }
@@ -47,9 +54,11 @@ async function loadTokensFromDisk(): Promise<void> {
 
 async function saveTokensToDisk(): Promise<void> {
   try {
-    const { mkdir } = await import("fs/promises");
     await mkdir(join(process.cwd(), "data"), { recursive: true });
-    await writeFile(TOKENS_FILE, JSON.stringify(Array.from(registeredTokens)), "utf-8");
+    const records: TokenRecord[] = Array.from(registeredTokens.entries()).map(
+      ([token, locale]) => ({ token, locale })
+    );
+    await writeFile(TOKENS_FILE, JSON.stringify(records), "utf-8");
   } catch (err) {
     logger.warn({ err }, "Failed to save push tokens to disk");
   }
@@ -236,9 +245,14 @@ async function pollAndNotify(): Promise<void> {
 
   logger.info({ count: newPosts.length, tokens: registeredTokens.size }, "Sending push notifications for new posts");
 
-  const tokens = Array.from(registeredTokens);
   for (const post of newPosts) {
-    const messages = tokens.map((token) => ({
+    const matchingTokens = Array.from(registeredTokens.entries())
+      .filter(([, locale]) => locale === post.locale)
+      .map(([token]) => token);
+
+    if (matchingTokens.length === 0) continue;
+
+    const messages = matchingTokens.map((token) => ({
       to: token,
       title: "New post on aklman",
       body: post.title || "A new article has been published",
@@ -267,15 +281,18 @@ function isValidExpoToken(token: string): boolean {
   return /^ExponentPushToken\[.+\]$/.test(token) || /^[a-zA-Z0-9_-]{20,}$/.test(token);
 }
 
+const VALID_LOCALES = new Set(Object.keys(RSS_FEEDS));
+
 router.post("/register", async (req, res) => {
-  const { token } = req.body as { token?: string };
+  const { token, locale } = req.body as { token?: string; locale?: string };
   if (!token || typeof token !== "string" || !isValidExpoToken(token)) {
     res.status(400).json({ error: "valid Expo push token is required" });
     return;
   }
-  registeredTokens.add(token);
+  const resolvedLocale = locale && VALID_LOCALES.has(locale) ? locale : "en";
+  registeredTokens.set(token, resolvedLocale);
   await saveTokensToDisk();
-  logger.info({ tokenCount: registeredTokens.size }, "Push token registered");
+  logger.info({ tokenCount: registeredTokens.size, locale: resolvedLocale }, "Push token registered");
   res.json({ ok: true });
 });
 
