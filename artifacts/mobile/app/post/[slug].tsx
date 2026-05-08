@@ -31,6 +31,37 @@ import {
   type ContentWidth,
   LINE_SPACING_PRESETS,
 } from "@/hooks/useReadingPrefs";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const SCROLL_KEY_PREFIX = "@aklman/scroll/";
+const SCROLL_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000;
+
+async function saveScrollPos(key: string, position: number): Promise<void> {
+  try {
+    await AsyncStorage.setItem(key, JSON.stringify({ position, savedAt: Date.now() }));
+  } catch {}
+}
+
+async function loadScrollPos(key: string): Promise<number | null> {
+  try {
+    const raw = await AsyncStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { position: number; savedAt: number };
+    if (Date.now() - parsed.savedAt > SCROLL_EXPIRY_MS) {
+      AsyncStorage.removeItem(key).catch(() => {});
+      return null;
+    }
+    return typeof parsed.position === "number" ? parsed.position : null;
+  } catch {
+    return null;
+  }
+}
+
+async function clearScrollPos(key: string): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(key);
+  } catch {}
+}
 
 function PostHeaderTitle({
   title,
@@ -698,6 +729,8 @@ export default function PostDetailScreen() {
   const progressAnim = useRef(new Animated.Value(0)).current;
   const webViewRef = useRef<WebView>(null);
   const recordedKeyRef = useRef<string | null>(null);
+  const scrollSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const restoredKeyRef = useRef<string | null>(null);
 
   const { data, isLoading, isError } = useGetBlogPost(
     slug ?? "",
@@ -881,6 +914,12 @@ export default function PostDetailScreen() {
     }
   }, [contentWidth]);
 
+  useEffect(() => {
+    return () => {
+      if (scrollSaveTimerRef.current) clearTimeout(scrollSaveTimerRef.current);
+    };
+  }, []);
+
   const htmlContent = useMemo(
     () => (post ? buildHtml(post.content ?? "", colors, isDark) : ""),
     [post, colors, isDark]
@@ -894,6 +933,11 @@ export default function PostDetailScreen() {
     [post, colors, isDark, fontSize, lineSpacing, contentWidth]
   );
 
+  const scrollStorageKey = useMemo(
+    () => (post ? `${SCROLL_KEY_PREFIX}${post.locale}:${post.slug}` : null),
+    [post]
+  );
+
   const onWebViewMessage = useCallback(
     (event: { nativeEvent: { data: string } }) => {
       try {
@@ -904,11 +948,33 @@ export default function PostDetailScreen() {
             duration: 80,
             useNativeDriver: false,
           }).start();
+          if (scrollStorageKey) {
+            if (msg.p >= 0.95) {
+              if (scrollSaveTimerRef.current) clearTimeout(scrollSaveTimerRef.current);
+              clearScrollPos(scrollStorageKey);
+            } else if (msg.p > 0.05) {
+              if (scrollSaveTimerRef.current) clearTimeout(scrollSaveTimerRef.current);
+              scrollSaveTimerRef.current = setTimeout(() => {
+                saveScrollPos(scrollStorageKey, msg.p);
+              }, 500);
+            }
+          }
         }
       } catch {}
     },
-    [progressAnim]
+    [progressAnim, scrollStorageKey]
   );
+
+  const restoreScrollPosition = useCallback(async () => {
+    if (Platform.OS === "web" || !webViewRef.current || !scrollStorageKey) return;
+    if (restoredKeyRef.current === scrollStorageKey) return;
+    restoredKeyRef.current = scrollStorageKey;
+    const position = await loadScrollPos(scrollStorageKey);
+    if (position == null || position <= 0.05) return;
+    webViewRef.current.injectJavaScript(
+      `setTimeout(function(){var p=${position};var el=document.documentElement;var total=(el.scrollHeight||document.body.scrollHeight)-(el.clientHeight||window.innerHeight);if(total>0){window.scrollTo(0,Math.round(p*total));}},400);true;`
+    );
+  }, [scrollStorageKey]);
 
   const openInBrowser = async () => {
     if (!post?.link) return;
@@ -971,6 +1037,7 @@ export default function PostDetailScreen() {
           allowsInlineMediaPlayback={false}
           injectedJavaScript={buildInjectedJS(fontSize, lineSpacing, contentWidth)}
           onMessage={onWebViewMessage}
+          onLoadEnd={() => { restoreScrollPosition(); }}
         />
       )}
 
