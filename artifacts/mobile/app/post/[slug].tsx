@@ -11,6 +11,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -612,6 +613,38 @@ export default function PostDetailScreen() {
 
   const post = data as PostWithContent | undefined;
 
+  const handleShare = useCallback(async () => {
+    if (!post) return;
+    const url = post.link;
+    const title = post.title;
+    if (Platform.OS === "web") {
+      if (navigator.share) {
+        try {
+          await navigator.share({ title, url });
+        } catch (err) {
+          if (err instanceof Error && err.name === "AbortError") return;
+          try {
+            await navigator.clipboard.writeText(url);
+            alert("Link copied to clipboard!");
+          } catch {}
+        }
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(url);
+        alert("Link copied to clipboard!");
+      } catch {}
+      return;
+    }
+    try {
+      await Share.share(
+        Platform.OS === "ios"
+          ? { url, message: title }
+          : { message: `${title}\n${url}` }
+      );
+    } catch {}
+  }, [post]);
+
   useEffect(() => {
     navigation.setOptions({
       ...(post?.title
@@ -680,6 +713,17 @@ export default function PostDetailScreen() {
               primaryColor={colors.primary}
               mutedColor={colors.mutedForeground}
             />
+            {post && (
+              <Pressable
+                onPress={handleShare}
+                hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+                style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1, paddingHorizontal: 6, paddingVertical: 4 })}
+                accessibilityLabel="Share article"
+                accessibilityRole="button"
+              >
+                <Feather name="share-2" size={20} color={colors.mutedForeground} />
+              </Pressable>
+            )}
           </View>
         );
       },
@@ -696,6 +740,7 @@ export default function PostDetailScreen() {
     isBookmarked,
     toggleBookmark,
     setSheetVisible,
+    handleShare,
   ]);
 
   useEffect(() => {
