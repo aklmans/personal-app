@@ -30,6 +30,7 @@ import {
   type LineSpacing,
   type ContentWidth,
   type FontFamily,
+  type ColorTheme,
   LINE_SPACING_PRESETS,
 } from "@/hooks/useReadingPrefs";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -181,6 +182,12 @@ const FONT_FAMILY_OPTS: { value: FontFamily; label: string; labelZh: string; sam
   { value: "sans", label: "Sans", labelZh: "无衬线", sampleFont: "Inter_400Regular" },
 ];
 
+const COLOR_THEME_OPTS: { value: ColorTheme; label: string; labelZh: string; bg: string; fg: string }[] = [
+  { value: "default", label: "Default", labelZh: "默认", bg: "transparent", fg: "" },
+  { value: "sepia", label: "Sepia", labelZh: "暖棕", bg: "#f5ede0", fg: "#3b2314" },
+  { value: "high-contrast", label: "High Contrast", labelZh: "高对比", bg: "#000000", fg: "#ffffff" },
+];
+
 function ReadingPrefsSheet({
   visible,
   onClose,
@@ -190,6 +197,8 @@ function ReadingPrefsSheet({
   setContentWidth,
   fontFamily,
   setFontFamily,
+  colorTheme,
+  setColorTheme,
   isZh,
 }: {
   visible: boolean;
@@ -200,6 +209,8 @@ function ReadingPrefsSheet({
   setContentWidth: (v: ContentWidth) => void;
   fontFamily: FontFamily;
   setFontFamily: (v: FontFamily) => void;
+  colorTheme: ColorTheme;
+  setColorTheme: (v: ColorTheme) => void;
   isZh: boolean;
 }) {
   const colors = useColors();
@@ -383,6 +394,53 @@ function ReadingPrefsSheet({
             );
           })}
         </View>
+
+        <Text
+          style={[
+            sheetStyles.sectionLabel,
+            {
+              color: colors.mutedForeground,
+              fontFamily: fonts.sans.semiBold,
+              marginTop: 18,
+            },
+          ]}
+        >
+          {isZh ? "文字主题" : "THEME"}
+        </Text>
+        <View style={sheetStyles.optRow}>
+          {COLOR_THEME_OPTS.map((opt) => {
+            const active = colorTheme === opt.value;
+            const swatchBg = opt.value === "default" ? colors.background : opt.bg;
+            const swatchFg = opt.value === "default" ? colors.text : opt.fg;
+            return (
+              <Pressable
+                key={opt.value}
+                onPress={() => setColorTheme(opt.value)}
+                style={({ pressed }) => [
+                  sheetStyles.optBtn,
+                  sheetStyles.themeBtn,
+                  {
+                    backgroundColor: swatchBg,
+                    borderColor: active ? colors.primary : colors.border,
+                    borderWidth: active ? 2 : 1,
+                    opacity: pressed ? 0.72 : 1,
+                  },
+                ]}
+                accessibilityLabel={opt.label}
+                accessibilityRole="button"
+              >
+                <Text
+                  style={[
+                    sheetStyles.optLabel,
+                    { color: swatchFg || colors.text, fontFamily: fonts.sans.regular },
+                  ]}
+                >
+                  {isZh ? opt.labelZh : opt.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
     </Modal>
   );
@@ -434,6 +492,7 @@ const sheetStyles = StyleSheet.create({
     borderWidth: 1,
   },
   optLabel: { fontSize: 13 },
+  themeBtn: { minWidth: 0 },
 });
 
 interface PostWithContent {
@@ -453,17 +512,31 @@ interface PostWithContent {
   related?: RelatedPost[];
 }
 
+function resolveThemeColors(
+  colorTheme: ColorTheme,
+  defaultBg: string,
+  defaultText: string
+): { bg: string; text: string } {
+  if (colorTheme === "sepia") return { bg: "#f5ede0", text: "#3b2314" };
+  if (colorTheme === "high-contrast") return { bg: "#000000", text: "#ffffff" };
+  return { bg: defaultBg, text: defaultText };
+}
+
 function buildInjectedJS(
   fontSize: number,
   lineSpacing: number,
   contentWidth: ContentWidth,
-  fontFamily: FontFamily
+  fontFamily: FontFamily,
+  colorTheme: ColorTheme,
+  defaultBg: string,
+  defaultText: string
 ): string {
   const maxW = contentWidth === "narrow" ? "680px" : "100%";
   const padH = contentWidth === "narrow" ? "24px" : "20px";
   const fontStack = fontFamily === "sans"
     ? "'Inter', system-ui, sans-serif"
     : "'Lora', Georgia, 'Times New Roman', serif";
+  const { bg, text } = resolveThemeColors(colorTheme, defaultBg, defaultText);
   return `(function() {
   document.documentElement.style.setProperty('font-size', '${fontSize}px', 'important');
   document.body.style.lineHeight = '${lineSpacing}';
@@ -473,6 +546,9 @@ function buildInjectedJS(
   document.body.style.marginLeft = 'auto';
   document.body.style.marginRight = 'auto';
   document.body.style.fontFamily = '${fontStack}';
+  document.body.style.backgroundColor = '${bg}';
+  document.body.style.color = '${text}';
+  document.documentElement.style.backgroundColor = '${bg}';
   function send() {
     var el = document.documentElement;
     var top = el.scrollTop || document.body.scrollTop || 0;
@@ -496,10 +572,10 @@ function buildHtml(
   fontSize = 17,
   lineSpacing = 1.85,
   contentWidth: ContentWidth = "full",
-  fontFamily: FontFamily = "serif"
+  fontFamily: FontFamily = "serif",
+  colorTheme: ColorTheme = "default"
 ): string {
-  const bg = colors.background;
-  const text = colors.text;
+  const { bg, text } = resolveThemeColors(colorTheme, colors.background, colors.text);
   const primary = colors.primary;
   const muted = colors.mutedForeground;
   const codeBg = isDark ? "#2e2825" : "#ede8e0";
@@ -853,6 +929,7 @@ export default function PostDetailScreen() {
     fontSize, canIncrease, canDecrease, increase, decrease,
     lineSpacing, setLineSpacing, contentWidth, setContentWidth,
     fontFamily, setFontFamily, hydrated,
+    colorTheme, setColorTheme,
   } = useReadingPrefs();
   const [sheetVisible, setSheetVisible] = useState(false);
   const { isBookmarked, toggleBookmark } = useBookmarks();
@@ -1086,17 +1163,26 @@ export default function PostDetailScreen() {
     }
   }, [fontFamily]);
 
+  useEffect(() => {
+    if (Platform.OS !== "web" && webViewRef.current) {
+      const { bg, text } = resolveThemeColors(colorTheme, colors.background, colors.text);
+      webViewRef.current.injectJavaScript(
+        `document.body.style.backgroundColor='${bg}';document.body.style.color='${text}';document.documentElement.style.backgroundColor='${bg}';true;`
+      );
+    }
+  }, [colorTheme, colors.background, colors.text]);
+
   const htmlContent = useMemo(
-    () => (post ? buildHtml(post.content ?? "", colors, isDark) : ""),
-    [post, colors, isDark]
+    () => (post ? buildHtml(post.content ?? "", colors, isDark, 17, 1.85, "full", "serif", colorTheme) : ""),
+    [post, colors, isDark, colorTheme]
   );
 
   const webHtmlContent = useMemo(
     () =>
       post
-        ? buildHtml(post.content ?? "", colors, isDark, fontSize, lineSpacing, contentWidth, fontFamily)
+        ? buildHtml(post.content ?? "", colors, isDark, fontSize, lineSpacing, contentWidth, fontFamily, colorTheme)
         : "",
-    [post, colors, isDark, fontSize, lineSpacing, contentWidth, fontFamily]
+    [post, colors, isDark, fontSize, lineSpacing, contentWidth, fontFamily, colorTheme]
   );
 
   const onWebViewMessage = useCallback(
@@ -1201,7 +1287,7 @@ export default function PostDetailScreen() {
           javaScriptEnabled
           domStorageEnabled={false}
           allowsInlineMediaPlayback={false}
-          injectedJavaScript={buildInjectedJS(fontSize, lineSpacing, contentWidth, fontFamily)}
+          injectedJavaScript={buildInjectedJS(fontSize, lineSpacing, contentWidth, fontFamily, colorTheme, colors.background, colors.text)}
           onMessage={onWebViewMessage}
           onLoadEnd={() => { restoreScrollPosition(); }}
         />
@@ -1343,6 +1429,8 @@ export default function PostDetailScreen() {
         setContentWidth={setContentWidth}
         fontFamily={fontFamily}
         setFontFamily={setFontFamily}
+        colorTheme={colorTheme}
+        setColorTheme={setColorTheme}
         isZh={isZh}
       />
     </View>

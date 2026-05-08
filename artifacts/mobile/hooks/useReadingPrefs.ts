@@ -8,8 +8,10 @@ export {
   LINE_SPACING_DEFAULT,
   CONTENT_WIDTH_DEFAULT,
   FONT_FAMILY_DEFAULT,
+  COLOR_THEME_DEFAULT,
   type LineSpacing,
   type ContentWidth,
   type FontFamily,
+  type ColorTheme,
   type ReadingPrefs,
 } from "@/context/ReadingPrefsContext";

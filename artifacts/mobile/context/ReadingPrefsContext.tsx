@@ -12,6 +12,7 @@ const FONT_SIZE_KEY = "@aklman/reading_font_size";
 const LINE_SPACING_KEY = "@aklman/reading_line_spacing";
 const CONTENT_WIDTH_KEY = "@aklman/reading_content_width";
 const FONT_FAMILY_KEY = "@aklman/reading_font_family";
+const COLOR_THEME_KEY = "@aklman/reading_color_theme";
 
 export const FONT_SIZE_DEFAULT = 17;
 export const FONT_SIZE_MIN = 14;
@@ -28,6 +29,9 @@ export const CONTENT_WIDTH_DEFAULT: ContentWidth = "full";
 export type FontFamily = "serif" | "sans";
 export const FONT_FAMILY_DEFAULT: FontFamily = "serif";
 
+export type ColorTheme = "default" | "sepia" | "high-contrast";
+export const COLOR_THEME_DEFAULT: ColorTheme = "default";
+
 export interface ReadingPrefs {
   fontSize: number;
   canIncrease: boolean;
@@ -41,6 +45,8 @@ export interface ReadingPrefs {
   fontFamily: FontFamily;
   setFontFamily: (v: FontFamily) => void;
   hydrated: boolean;
+  colorTheme: ColorTheme;
+  setColorTheme: (v: ColorTheme) => void;
 }
 
 const defaultPrefs: ReadingPrefs = {
@@ -56,6 +62,8 @@ const defaultPrefs: ReadingPrefs = {
   fontFamily: FONT_FAMILY_DEFAULT,
   setFontFamily: () => {},
   hydrated: false,
+  colorTheme: COLOR_THEME_DEFAULT,
+  setColorTheme: () => {},
 };
 
 const ReadingPrefsContext = createContext<ReadingPrefs>(defaultPrefs);
@@ -76,6 +84,9 @@ export function ReadingPrefsProvider({
     FONT_FAMILY_DEFAULT
   );
   const [hydrated, setHydrated] = useState(false);
+  const [colorTheme, setColorThemeState] = useState<ColorTheme>(
+    COLOR_THEME_DEFAULT
+  );
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -84,8 +95,9 @@ export function ReadingPrefsProvider({
       AsyncStorage.getItem(LINE_SPACING_KEY),
       AsyncStorage.getItem(CONTENT_WIDTH_KEY),
       AsyncStorage.getItem(FONT_FAMILY_KEY),
+      AsyncStorage.getItem(COLOR_THEME_KEY),
     ])
-      .then(([storedSize, storedSpacing, storedWidth, storedFamily]) => {
+      .then(([storedSize, storedSpacing, storedWidth, storedFamily, storedTheme]) => {
         if (storedSize !== null) {
           const parsed = parseInt(storedSize, 10);
           if (!isNaN(parsed) && parsed >= FONT_SIZE_MIN && parsed <= FONT_SIZE_MAX) {
@@ -103,6 +115,9 @@ export function ReadingPrefsProvider({
         }
         if (storedFamily === "serif" || storedFamily === "sans") {
           setFontFamilyState(storedFamily);
+        }
+        if (storedTheme === "default" || storedTheme === "sepia" || storedTheme === "high-contrast") {
+          setColorThemeState(storedTheme as ColorTheme);
         }
         setHydrated(true);
       })
@@ -151,6 +166,11 @@ export function ReadingPrefsProvider({
     AsyncStorage.setItem(FONT_FAMILY_KEY, v);
   }, []);
 
+  const setColorTheme = useCallback((v: ColorTheme) => {
+    setColorThemeState(v);
+    AsyncStorage.setItem(COLOR_THEME_KEY, v);
+  }, []);
+
   const value: ReadingPrefs = {
     fontSize,
     canIncrease: fontSize < FONT_SIZE_MAX,
@@ -164,6 +184,8 @@ export function ReadingPrefsProvider({
     fontFamily,
     setFontFamily,
     hydrated,
+    colorTheme,
+    setColorTheme,
   };
 
   return (
