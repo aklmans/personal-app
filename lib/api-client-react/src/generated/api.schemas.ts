@@ -8,3 +8,89 @@
 export interface HealthStatus {
   status: string;
 }
+
+export interface BlogPost {
+  slug: string;
+  title: string;
+  description: string;
+  pubDate: string;
+  link: string;
+  coverImage?: string | null;
+  categories: string[];
+  tags: string[];
+  readingTime?: number | null;
+  locale: string;
+}
+
+export interface BlogTaxonomy {
+  slug: string;
+  name: string;
+  count: number;
+}
+
+export interface ErrorResponse {
+  error: string;
+}
+
+export type ListBlogPostsParams = {
+  locale?: ListBlogPostsLocale;
+  category?: string;
+  tag?: string;
+};
+
+export type ListBlogPostsLocale =
+  (typeof ListBlogPostsLocale)[keyof typeof ListBlogPostsLocale];
+
+export const ListBlogPostsLocale = {
+  en: "en",
+  "zh-cn": "zh-cn",
+} as const;
+
+export type GetBlogPostParams = {
+  locale?: GetBlogPostLocale;
+};
+
+export type GetBlogPostLocale =
+  (typeof GetBlogPostLocale)[keyof typeof GetBlogPostLocale];
+
+export const GetBlogPostLocale = {
+  en: "en",
+  "zh-cn": "zh-cn",
+} as const;
+
+export type ListBlogCategoriesParams = {
+  locale?: ListBlogCategoriesLocale;
+};
+
+export type ListBlogCategoriesLocale =
+  (typeof ListBlogCategoriesLocale)[keyof typeof ListBlogCategoriesLocale];
+
+export const ListBlogCategoriesLocale = {
+  en: "en",
+  "zh-cn": "zh-cn",
+} as const;
+
+export type ListBlogTagsParams = {
+  locale?: ListBlogTagsLocale;
+};
+
+export type ListBlogTagsLocale =
+  (typeof ListBlogTagsLocale)[keyof typeof ListBlogTagsLocale];
+
+export const ListBlogTagsLocale = {
+  en: "en",
+  "zh-cn": "zh-cn",
+} as const;
+
+export type SearchBlogPostsParams = {
+  q: string;
+  locale?: SearchBlogPostsLocale;
+};
+
+export type SearchBlogPostsLocale =
+  (typeof SearchBlogPostsLocale)[keyof typeof SearchBlogPostsLocale];
+
+export const SearchBlogPostsLocale = {
+  en: "en",
+  "zh-cn": "zh-cn",
+} as const;

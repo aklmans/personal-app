@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: blog
+    description: Blog content operations
 paths:
   /healthz:
     get:
@@ -24,6 +26,141 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /blog/posts:
+    get:
+      operationId: listBlogPosts
+      tags: [blog]
+      summary: List blog posts
+      description: Returns posts from the RSS feed
+      parameters:
+        - name: locale
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [en, zh-cn]
+            default: en
+        - name: category
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: tag
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of blog posts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BlogPost"
+  /blog/posts/{slug}:
+    get:
+      operationId: getBlogPost
+      tags: [blog]
+      summary: Get a single blog post
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: locale
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [en, zh-cn]
+            default: en
+      responses:
+        "200":
+          description: Blog post
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BlogPost"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /blog/categories:
+    get:
+      operationId: listBlogCategories
+      tags: [blog]
+      summary: List blog categories
+      parameters:
+        - name: locale
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [en, zh-cn]
+            default: en
+      responses:
+        "200":
+          description: List of categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BlogTaxonomy"
+  /blog/tags:
+    get:
+      operationId: listBlogTags
+      tags: [blog]
+      summary: List blog tags
+      parameters:
+        - name: locale
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [en, zh-cn]
+            default: en
+      responses:
+        "200":
+          description: List of tags
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BlogTaxonomy"
+  /blog/search:
+    get:
+      operationId: searchBlogPosts
+      tags: [blog]
+      summary: Search blog posts
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: locale
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [en, zh-cn]
+            default: en
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BlogPost"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +170,61 @@ components:
           type: string
       required:
         - status
-
+    BlogPost:
+      type: object
+      properties:
+        slug:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        pubDate:
+          type: string
+        link:
+          type: string
+        coverImage:
+          type: string
+          nullable: true
+        categories:
+          type: array
+          items:
+            type: string
+        tags:
+          type: array
+          items:
+            type: string
+        readingTime:
+          type: integer
+          nullable: true
+        locale:
+          type: string
+      required:
+        - slug
+        - title
+        - description
+        - pubDate
+        - link
+        - categories
+        - tags
+        - locale
+    BlogTaxonomy:
+      type: object
+      properties:
+        slug:
+          type: string
+        name:
+          type: string
+        count:
+          type: integer
+      required:
+        - slug
+        - name
+        - count
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
