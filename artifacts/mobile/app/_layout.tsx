@@ -22,6 +22,8 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { LanguageProvider } from "@/context/LanguageContext";
+import { ThemeProvider } from "@/context/ThemeContext";
+import { useColors } from "@/hooks/useColors";
 
 setBaseUrl(`https://${process.env.EXPO_PUBLIC_DOMAIN}`);
 
@@ -36,38 +38,55 @@ const queryClient = new QueryClient({
   },
 });
 
-function RootLayoutNav() {
+function StackNav() {
+  const colors = useColors();
   return (
     <Stack
       screenOptions={{
         headerBackTitle: "Back",
-        headerStyle: { backgroundColor: "transparent" },
-        headerTransparent: false,
+        headerStyle: { backgroundColor: colors.background },
+        headerTintColor: colors.primary,
+        headerTitleStyle: { color: colors.text },
+        contentStyle: { backgroundColor: colors.background },
       }}
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen
         name="post/[slug]"
-        options={{
-          title: "",
-          headerBackTitle: "Back",
-        }}
+        options={{ title: "", headerBackTitle: "Back" }}
       />
       <Stack.Screen
         name="category/[slug]"
-        options={{
-          title: "Category",
-          headerBackTitle: "Back",
-        }}
+        options={{ title: "Category", headerBackTitle: "Back" }}
       />
       <Stack.Screen
         name="tag/[slug]"
+        options={{ title: "Tag", headerBackTitle: "Back" }}
+      />
+      <Stack.Screen
+        name="archives"
         options={{
-          title: "Tag",
+          title: "Archives",
           headerBackTitle: "Back",
         }}
       />
     </Stack>
+  );
+}
+
+function AppProviders({ children }: { children: React.ReactNode }) {
+  return (
+    <SafeAreaProvider>
+      <ErrorBoundary>
+        <QueryClientProvider client={queryClient}>
+          <LanguageProvider>
+            <GestureHandlerRootView>
+              <KeyboardProvider>{children}</KeyboardProvider>
+            </GestureHandlerRootView>
+          </LanguageProvider>
+        </QueryClientProvider>
+      </ErrorBoundary>
+    </SafeAreaProvider>
   );
 }
 
@@ -92,18 +111,10 @@ export default function RootLayout() {
   if (!fontsLoaded && !fontError) return null;
 
   return (
-    <SafeAreaProvider>
-      <ErrorBoundary>
-        <QueryClientProvider client={queryClient}>
-          <LanguageProvider>
-            <GestureHandlerRootView>
-              <KeyboardProvider>
-                <RootLayoutNav />
-              </KeyboardProvider>
-            </GestureHandlerRootView>
-          </LanguageProvider>
-        </QueryClientProvider>
-      </ErrorBoundary>
-    </SafeAreaProvider>
+    <ThemeProvider>
+      <AppProviders>
+        <StackNav />
+      </AppProviders>
+    </ThemeProvider>
   );
 }

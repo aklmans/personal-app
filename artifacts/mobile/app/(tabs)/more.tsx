@@ -7,7 +7,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  useColorScheme,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -15,6 +14,7 @@ import { useRouter } from "expo-router";
 
 import { fonts } from "@/constants/fonts";
 import { useLanguage } from "@/context/LanguageContext";
+import { useTheme, type ThemePreference } from "@/context/ThemeContext";
 import { useColors } from "@/hooks/useColors";
 
 interface NavItem {
@@ -24,12 +24,18 @@ interface NavItem {
   onPress: () => void;
 }
 
+const THEME_OPTIONS: { value: ThemePreference; label: string; labelZh: string; icon: keyof typeof Feather.glyphMap }[] = [
+  { value: "light", label: "Light", labelZh: "浅色", icon: "sun" },
+  { value: "dark", label: "Dark", labelZh: "深色", icon: "moon" },
+  { value: "system", label: "System", labelZh: "跟随系统", icon: "smartphone" },
+];
+
 export default function MoreScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { locale, toggleLocale, isZh } = useLanguage();
+  const { preference, setPreference } = useTheme();
   const router = useRouter();
-  const colorScheme = useColorScheme();
   const topPad = Platform.OS === "web" ? Math.max(insets.top, 67) : insets.top;
 
   const openUrl = useCallback(async (url: string) => {
@@ -55,7 +61,7 @@ export default function MoreScreen() {
       icon: "archive",
       label: "Archives",
       labelZh: "归档",
-      onPress: () => openUrl("https://aklman.com/archives"),
+      onPress: () => router.push("/archives"),
     },
     {
       icon: "star",
@@ -74,7 +80,11 @@ export default function MoreScreen() {
       label: "RSS Feed",
       labelZh: "RSS 订阅",
       onPress: () =>
-        openUrl(isZh ? "https://aklman.com/zh-cn/rss.xml" : "https://aklman.com/rss.xml"),
+        openUrl(
+          isZh
+            ? "https://aklman.com/zh-cn/rss.xml"
+            : "https://aklman.com/rss.xml"
+        ),
     },
   ];
 
@@ -85,7 +95,8 @@ export default function MoreScreen() {
         styles.content,
         {
           paddingTop: topPad + 12,
-          paddingBottom: insets.bottom + 24 + (Platform.OS === "web" ? 34 : 0),
+          paddingBottom:
+            insets.bottom + 24 + (Platform.OS === "web" ? 34 : 0),
         },
       ]}
       showsVerticalScrollIndicator={false}
@@ -93,7 +104,7 @@ export default function MoreScreen() {
       <View
         style={[
           styles.blogHeader,
-          { borderBottomColor: colors.border, paddingBottom: 20 },
+          { borderBottomColor: colors.border },
         ]}
       >
         <Text
@@ -130,7 +141,6 @@ export default function MoreScreen() {
             style={({ pressed }) => [
               styles.row,
               {
-                borderBottomColor: colors.border,
                 backgroundColor: pressed
                   ? colors.secondary
                   : colors.card,
@@ -173,12 +183,13 @@ export default function MoreScreen() {
         >
           {isZh ? "设置" : "SETTINGS"}
         </Text>
+
         <View
           style={[
-            styles.row,
+            styles.settingRow,
             {
-              borderBottomColor: colors.border,
               backgroundColor: colors.card,
+              borderColor: colors.border,
             },
           ]}
         >
@@ -199,7 +210,10 @@ export default function MoreScreen() {
           </View>
           <Pressable
             onPress={toggleLocale}
-            style={[styles.langBadge, { borderColor: colors.border }]}
+            style={[
+              styles.langBadge,
+              { borderColor: colors.border },
+            ]}
           >
             <Text
               style={[
@@ -214,19 +228,19 @@ export default function MoreScreen() {
 
         <View
           style={[
-            styles.row,
+            styles.themeBlock,
             {
-              borderBottomColor: colors.border,
               backgroundColor: colors.card,
+              borderColor: colors.border,
             },
           ]}
         >
-          <View style={styles.rowLeft}>
+          <View style={[styles.rowLeft, { paddingBottom: 10 }]}>
             <View
               style={[styles.iconWrap, { backgroundColor: colors.secondary }]}
             >
               <Feather
-                name={colorScheme === "dark" ? "moon" : "sun"}
+                name={preference === "dark" ? "moon" : preference === "light" ? "sun" : "smartphone"}
                 size={17}
                 color={colors.primary}
               />
@@ -240,20 +254,43 @@ export default function MoreScreen() {
               {isZh ? "外观" : "Appearance"}
             </Text>
           </View>
-          <Text
-            style={[
-              styles.schemeLabel,
-              { color: colors.mutedForeground, fontFamily: fonts.sans.regular },
-            ]}
-          >
-            {colorScheme === "dark"
-              ? isZh
-                ? "深色"
-                : "Dark"
-              : isZh
-              ? "浅色"
-              : "Light"}
-          </Text>
+          <View style={styles.themeOptions}>
+            {THEME_OPTIONS.map((opt) => {
+              const isActive = preference === opt.value;
+              return (
+                <Pressable
+                  key={opt.value}
+                  onPress={() => setPreference(opt.value)}
+                  style={[
+                    styles.themeBtn,
+                    {
+                      backgroundColor: isActive
+                        ? colors.primary
+                        : colors.secondary,
+                      borderColor: isActive ? colors.primary : colors.border,
+                    },
+                  ]}
+                >
+                  <Feather
+                    name={opt.icon}
+                    size={14}
+                    color={isActive ? "#ffffff" : colors.mutedForeground}
+                  />
+                  <Text
+                    style={[
+                      styles.themeBtnLabel,
+                      {
+                        color: isActive ? "#ffffff" : colors.text,
+                        fontFamily: fonts.sans.medium,
+                      },
+                    ]}
+                  >
+                    {isZh ? opt.labelZh : opt.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </View>
       </View>
 
@@ -282,6 +319,7 @@ const styles = StyleSheet.create({
   },
   blogHeader: {
     borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingBottom: 20,
   },
   blogTitle: {
     fontSize: 28,
@@ -306,7 +344,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: 8,
     marginBottom: 4,
-    borderBottomWidth: 0,
   },
   rowLeft: {
     flexDirection: "row",
@@ -323,6 +360,16 @@ const styles = StyleSheet.create({
   rowLabel: {
     fontSize: 16,
   },
+  settingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 13,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    marginBottom: 4,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
   langBadge: {
     borderWidth: 1,
     borderRadius: 12,
@@ -332,8 +379,29 @@ const styles = StyleSheet.create({
   langBadgeText: {
     fontSize: 13,
   },
-  schemeLabel: {
-    fontSize: 14,
+  themeBlock: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    marginBottom: 4,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  themeOptions: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  themeBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    borderRadius: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 8,
+  },
+  themeBtnLabel: {
+    fontSize: 13,
   },
   footer: {
     marginTop: 32,

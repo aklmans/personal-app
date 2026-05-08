@@ -19,6 +19,7 @@ interface BlogPost {
   tags: string[];
   readingTime: number | null;
   locale: string;
+  content: string;
 }
 
 interface BlogTaxonomy {
@@ -34,6 +35,37 @@ interface CacheEntry {
 
 const cache: Record<string, CacheEntry> = {};
 const CACHE_TTL = 5 * 60 * 1000;
+
+const contentCache: Map<string, { html: string; ts: number }> = new Map();
+const CONTENT_TTL = 15 * 60 * 1000;
+
+function extractArticleHtml(pageHtml: string): string {
+  // Try <article>
+  const articleMatch = pageHtml.match(/<article[^>]*>([\s\S]*?)<\/article>/i);
+  if (articleMatch) return articleMatch[1];
+  // Fallback: try <main>
+  const mainMatch = pageHtml.match(/<main[^>]*>([\s\S]*?)<\/main>/i);
+  if (mainMatch) return mainMatch[1];
+  return "";
+}
+
+async function fetchPostContent(url: string): Promise<string> {
+  const cached = contentCache.get(url);
+  if (cached && Date.now() - cached.ts < CONTENT_TTL) return cached.html;
+  try {
+    const res = await fetch(url, {
+      headers: { "User-Agent": "aklman-mobile/1.0" },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return "";
+    const html = await res.text();
+    const extracted = extractArticleHtml(html);
+    contentCache.set(url, { html: extracted, ts: Date.now() });
+    return extracted;
+  } catch {
+    return "";
+  }
+}
 
 function slugify(str: string): string {
   return str
@@ -115,9 +147,14 @@ async function fetchFeed(locale: string): Promise<BlogPost[]> {
       const content = getText(item["content:encoded"]);
 
       const rawCats = item["category"] as unknown[] | undefined;
-      const categories: string[] = rawCats
+      const allCats: string[] = rawCats
         ? rawCats.map((c) => getText(c)).filter(Boolean)
         : [];
+
+      // Use first category as primary category; remaining as tags
+      // (Astro RSS plugin outputs tags as <category> elements too)
+      const categories: string[] = allCats.slice(0, 1);
+      const tags: string[] = allCats.length > 1 ? allCats.slice(1) : allCats;
 
       const slug = extractSlugFromUrl(link);
       const coverImage = extractCoverImage(content);
@@ -131,9 +168,10 @@ async function fetchFeed(locale: string): Promise<BlogPost[]> {
         link,
         coverImage,
         categories,
-        tags: [],
+        tags,
         readingTime,
         locale,
+        content,
       };
     });
 
@@ -150,6 +188,7 @@ router.get("/posts", async (req, res) => {
     const locale = (req.query["locale"] as string) || "en";
     const category = req.query["category"] as string | undefined;
 
+    const tag = req.query["tag"] as string | undefined;
     let posts = await fetchFeed(locale);
 
     if (category) {
@@ -157,6 +196,14 @@ router.get("/posts", async (req, res) => {
         p.categories.some(
           (c) =>
             slugify(c) === category || c.toLowerCase() === category.toLowerCase()
+        )
+      );
+    }
+
+    if (tag) {
+      posts = posts.filter((p) =>
+        p.tags.some(
+          (t) => slugify(t) === tag || t.toLowerCase() === tag.toLowerCase()
         )
       );
     }
@@ -178,7 +225,13 @@ router.get("/posts/:slug", async (req, res) => {
       return;
     }
 
-    res.json(post);
+    // Scrape full article content if not already in the feed
+    let articleContent = post.content;
+    if (!articleContent && post.link) {
+      articleContent = await fetchPostContent(post.link);
+    }
+
+    res.json({ ...post, content: articleContent });
   } catch {
     res.status(500).json({ error: "Failed to fetch post" });
   }

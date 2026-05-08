@@ -2,37 +2,145 @@ import { Feather } from "@expo/vector-icons";
 import { useGetBlogPost } from "@workspace/api-client-react";
 import * as WebBrowser from "expo-web-browser";
 import { useLocalSearchParams, useNavigation } from "expo-router";
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import {
-  Image,
+  ActivityIndicator,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import WebView from "react-native-webview";
 
-import { CategoryPill } from "@/components/CategoryPill";
-import { SkeletonCard } from "@/components/SkeletonCard";
 import { fonts } from "@/constants/fonts";
 import { useColors } from "@/hooks/useColors";
+import { useTheme } from "@/context/ThemeContext";
 
-function formatDate(pubDate: string): string {
-  try {
-    return new Date(pubDate).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  } catch {
-    return pubDate;
-  }
+interface PostWithContent {
+  slug: string;
+  title: string;
+  description: string;
+  pubDate: string;
+  link: string;
+  coverImage?: string | null;
+  categories: string[];
+  tags: string[];
+  readingTime?: number | null;
+  content: string;
+  locale: string;
+}
+
+function buildHtml(content: string, colors: ReturnType<typeof useColors>, isDark: boolean): string {
+  const bg = colors.background;
+  const text = colors.text;
+  const primary = colors.primary;
+  const muted = colors.mutedForeground;
+  const codeBg = isDark ? "#2e2825" : "#ede8e0";
+  const border = colors.border;
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=4.0">
+  <style>
+    * { box-sizing: border-box; }
+    html { font-size: 17px; -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0; padding: 0 20px 40px;
+      background-color: ${bg};
+      color: ${text};
+      font-family: Georgia, 'Times New Roman', serif;
+      line-height: 1.75;
+      max-width: 100%;
+      word-wrap: break-word;
+      overflow-x: hidden;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      font-family: Georgia, serif;
+      color: ${text};
+      line-height: 1.3;
+      margin-top: 1.8em;
+      margin-bottom: 0.5em;
+    }
+    h1 { font-size: 1.6em; }
+    h2 { font-size: 1.35em; }
+    h3 { font-size: 1.15em; }
+    a { color: ${primary}; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    p { margin: 0 0 1.2em; }
+    img { max-width: 100%; height: auto; border-radius: 6px; display: block; margin: 1em auto; }
+    figure { margin: 1.5em 0; }
+    figcaption { font-size: 0.85em; color: ${muted}; text-align: center; margin-top: 0.4em; }
+    pre {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      background: ${codeBg};
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin: 1.2em 0;
+      font-size: 14px;
+    }
+    code {
+      font-family: 'Menlo', 'Courier New', monospace;
+      font-size: 14px;
+    }
+    pre code {
+      background: none;
+      padding: 0;
+      font-size: inherit;
+    }
+    :not(pre) > code {
+      background: ${codeBg};
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.88em;
+    }
+    blockquote {
+      border-left: 3px solid ${primary};
+      margin: 1.2em 0;
+      padding: 4px 0 4px 16px;
+      color: ${muted};
+      font-style: italic;
+    }
+    blockquote p { margin: 0; }
+    hr {
+      border: 0;
+      border-top: 1px solid ${border};
+      margin: 2em 0;
+    }
+    table {
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      border-collapse: collapse;
+      margin: 1.2em 0;
+    }
+    th, td {
+      padding: 8px 12px;
+      border: 1px solid ${border};
+      text-align: left;
+      font-size: 0.9em;
+    }
+    th { background: ${codeBg}; font-weight: 600; }
+    ul, ol { padding-left: 1.6em; margin: 0.8em 0 1.2em; }
+    li { margin-bottom: 0.4em; }
+    .astro-code, .shiki {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+  </style>
+</head>
+<body>${content || "<p>No content available for this article. Tap the button below to read it in full.</p>"}</body>
+</html>`;
 }
 
 export default function PostDetailScreen() {
   const colors = useColors();
+  const { resolved } = useTheme();
+  const isDark = resolved === "dark";
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const { slug, locale } = useLocalSearchParams<{
@@ -42,45 +150,51 @@ export default function PostDetailScreen() {
 
   const safeLocale = (locale === "zh-cn" ? "zh-cn" : "en") as "en" | "zh-cn";
 
-  const { data: post, isLoading, isError } = useGetBlogPost(
+  const { data, isLoading, isError } = useGetBlogPost(
     slug ?? "",
     { locale: safeLocale },
     { query: { enabled: !!slug, refetchOnWindowFocus: false } }
   );
 
+  const post = data as PostWithContent | undefined;
+
   useEffect(() => {
     if (post?.title) {
-      navigation.setOptions({ title: "" });
+      navigation.setOptions({ title: post.title });
     }
   }, [post, navigation]);
 
+  const htmlContent = useMemo(
+    () => (post ? buildHtml(post.content ?? "", colors, isDark) : ""),
+    [post, colors, isDark]
+  );
+
   const openInBrowser = async () => {
     if (!post?.link) return;
-    const url =
-      safeLocale === "zh-cn"
-        ? `${post.link}zh-cn/`.replace(/\/+$/, "/")
-        : post.link;
-    await WebBrowser.openBrowserAsync(url);
+    await WebBrowser.openBrowserAsync(post.link);
   };
 
-  const bottomPad =
-    insets.bottom + 24 + (Platform.OS === "web" ? 34 : 0);
+  const bottomPad = insets.bottom + 16 + (Platform.OS === "web" ? 34 : 0);
 
   if (isLoading) {
     return (
       <View
-        style={[styles.root, { backgroundColor: colors.background, paddingTop: 16 }]}
+        style={[
+          styles.root,
+          styles.center,
+          { backgroundColor: colors.background },
+        ]}
       >
-        <View style={{ paddingHorizontal: 20 }}>
-          <SkeletonCard />
-        </View>
+        <ActivityIndicator color={colors.primary} size="large" />
       </View>
     );
   }
 
   if (isError || !post) {
     return (
-      <View style={[styles.root, styles.center, { backgroundColor: colors.background }]}>
+      <View
+        style={[styles.root, styles.center, { backgroundColor: colors.background }]}
+      >
         <Feather name="alert-circle" size={36} color={colors.mutedForeground} />
         <Text
           style={[
@@ -95,97 +209,59 @@ export default function PostDetailScreen() {
   }
 
   return (
-    <ScrollView
-      style={[styles.root, { backgroundColor: colors.background }]}
-      contentContainerStyle={{ paddingBottom: bottomPad }}
-      showsVerticalScrollIndicator={false}
-    >
-      {post.coverImage && (
-        <Image
-          source={{ uri: post.coverImage }}
-          style={styles.cover}
-          resizeMode="cover"
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
+      {Platform.OS === "web" ? (
+        <iframe
+          srcDoc={htmlContent}
+          style={{
+            flex: 1,
+            border: "none",
+            width: "100%",
+            height: "100%",
+            backgroundColor: colors.background,
+          } as React.CSSProperties}
+          title={post.title}
+        />
+      ) : (
+        <WebView
+          source={{ html: htmlContent, baseUrl: post.link }}
+          style={[styles.webview, { backgroundColor: colors.background }]}
+          originWhitelist={["*"]}
+          scrollEnabled
+          showsVerticalScrollIndicator={false}
+          contentInset={{ bottom: bottomPad }}
+          javaScriptEnabled={false}
+          domStorageEnabled={false}
+          allowsInlineMediaPlayback={false}
         />
       )}
 
-      <View style={styles.body}>
-        {post.categories.length > 0 && (
-          <View style={styles.categories}>
-            {post.categories.map((cat: string) => (
-              <CategoryPill key={cat} label={cat} />
-            ))}
-          </View>
-        )}
-
-        <Text
-          style={[
-            styles.title,
-            { color: colors.text, fontFamily: fonts.serif.bold },
-          ]}
-        >
-          {post.title}
-        </Text>
-
-        <View style={styles.meta}>
-          <Text
-            style={[
-              styles.metaText,
-              { color: colors.mutedForeground, fontFamily: fonts.sans.regular },
-            ]}
-          >
-            {formatDate(post.pubDate)}
-          </Text>
-          {post.readingTime != null && (
-            <Text
-              style={[
-                styles.metaText,
-                { color: colors.mutedForeground, fontFamily: fonts.sans.regular },
-              ]}
-            >
-              {" · "}
-              {post.readingTime} min read
-            </Text>
-          )}
-        </View>
-
-        <View
-          style={[styles.divider, { backgroundColor: colors.border }]}
-        />
-
-        <Text
-          style={[
-            styles.excerpt,
-            { color: colors.text, fontFamily: fonts.serif.italic ?? fonts.serif.regular },
-          ]}
-        >
-          {post.description}
-        </Text>
-
-        <View
-          style={[styles.divider, { backgroundColor: colors.border }]}
-        />
-
+      <View
+        style={[
+          styles.footer,
+          {
+            paddingBottom: bottomPad,
+            backgroundColor: colors.background,
+            borderTopColor: colors.border,
+          },
+        ]}
+      >
         <Pressable
           onPress={openInBrowser}
           style={({ pressed }) => [
-            styles.readBtn,
-            {
-              backgroundColor: pressed ? colors.accentForeground === "#1a1714" ? "#c05540" : "#c86341" : colors.primary,
-            },
+            styles.openBtn,
+            { backgroundColor: pressed ? "#c05540" : colors.primary },
           ]}
         >
           <Text
-            style={[
-              styles.readBtnText,
-              { fontFamily: fonts.sans.semiBold },
-            ]}
+            style={[styles.openBtnText, { fontFamily: fonts.sans.semiBold }]}
           >
-            Read Full Article
+            Open on aklman.com
           </Text>
-          <Feather name="external-link" size={16} color="#ffffff" />
+          <Feather name="external-link" size={15} color="#ffffff" />
         </Pressable>
       </View>
-    </ScrollView>
+    </View>
   );
 }
 
@@ -198,57 +274,30 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 12,
   },
-  cover: {
-    width: "100%",
-    height: 240,
+  webview: {
+    flex: 1,
   },
-  body: {
-    padding: 20,
+  footer: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
-  categories: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-    marginBottom: 14,
-  },
-  title: {
-    fontSize: 26,
-    lineHeight: 34,
-    marginBottom: 12,
-  },
-  meta: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  metaText: {
-    fontSize: 13,
-  },
-  divider: {
-    height: 1,
-    marginVertical: 20,
-    opacity: 0.4,
-  },
-  excerpt: {
-    fontSize: 17,
-    lineHeight: 27,
-  },
-  errorText: {
-    fontSize: 16,
-    marginTop: 8,
-  },
-  readBtn: {
+  openBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
     borderRadius: 8,
-    paddingVertical: 14,
+    paddingVertical: 13,
     paddingHorizontal: 20,
-    marginTop: 4,
+    marginBottom: 4,
   },
-  readBtnText: {
+  openBtnText: {
     color: "#ffffff",
+    fontSize: 15,
+  },
+  errorText: {
     fontSize: 16,
+    marginTop: 8,
   },
 });

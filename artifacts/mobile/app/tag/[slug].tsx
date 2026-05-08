@@ -30,7 +30,7 @@ export default function TagScreen() {
 
   const isAll = slug === "all";
   const { data: posts, isLoading, refetch, isRefetching } = useListBlogPosts(
-    { locale },
+    isAll ? { locale } : { locale, tag: slug },
     { query: { enabled: true, refetchOnWindowFocus: false } }
   );
 
@@ -49,15 +49,7 @@ export default function TagScreen() {
     });
   }, [navigation, currentTag, isAll, isZh, slug]);
 
-  const filteredPosts = isAll
-    ? (posts ?? [])
-    : (posts ?? []).filter((p) =>
-        p.tags.some(
-          (t: string) =>
-            t.toLowerCase().replace(/\s+/g, "-") === slug ||
-            t.toLowerCase() === slug
-        )
-      );
+  const filteredPosts = posts ?? [];
 
   const handlePostPress = useCallback(
     (post: PostData) => {
