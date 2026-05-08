@@ -25,6 +25,7 @@ import { BookmarksProvider } from "@/context/BookmarksContext";
 import { HistoryProvider } from "@/context/HistoryContext";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { NotificationsProvider } from "@/context/NotificationsContext";
+import { ReadingPrefsProvider } from "@/context/ReadingPrefsContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { useColors } from "@/hooks/useColors";
 
@@ -93,15 +94,17 @@ function AppProviders({ children }: { children: React.ReactNode }) {
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
           <LanguageProvider>
-            <BookmarksProvider>
-              <HistoryProvider>
-                <NotificationsProvider>
-                  <GestureHandlerRootView>
-                    <KeyboardProvider>{children}</KeyboardProvider>
-                  </GestureHandlerRootView>
-                </NotificationsProvider>
-              </HistoryProvider>
-            </BookmarksProvider>
+            <ReadingPrefsProvider>
+              <BookmarksProvider>
+                <HistoryProvider>
+                  <NotificationsProvider>
+                    <GestureHandlerRootView>
+                      <KeyboardProvider>{children}</KeyboardProvider>
+                    </GestureHandlerRootView>
+                  </NotificationsProvider>
+                </HistoryProvider>
+              </BookmarksProvider>
+            </ReadingPrefsProvider>
           </LanguageProvider>
         </QueryClientProvider>
       </ErrorBoundary>
