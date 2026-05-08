@@ -731,6 +731,7 @@ export default function PostDetailScreen() {
   const recordedKeyRef = useRef<string | null>(null);
   const scrollSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const restoredKeyRef = useRef<string | null>(null);
+  const lastScrollPosRef = useRef<number>(0);
 
   const { data, isLoading, isError } = useGetBlogPost(
     slug ?? "",
@@ -920,6 +921,21 @@ export default function PostDetailScreen() {
     };
   }, []);
 
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("blur", () => {
+      if (!scrollStorageKey) return;
+      const p = lastScrollPosRef.current;
+      if (scrollSaveTimerRef.current) {
+        clearTimeout(scrollSaveTimerRef.current);
+        scrollSaveTimerRef.current = null;
+        if (p > 0.05 && p < 0.95) {
+          saveScrollPos(scrollStorageKey, p);
+        }
+      }
+    });
+    return unsubscribe;
+  }, [navigation, scrollStorageKey]);
+
   const htmlContent = useMemo(
     () => (post ? buildHtml(post.content ?? "", colors, isDark) : ""),
     [post, colors, isDark]
@@ -948,6 +964,7 @@ export default function PostDetailScreen() {
             duration: 80,
             useNativeDriver: false,
           }).start();
+          lastScrollPosRef.current = msg.p;
           if (scrollStorageKey) {
             if (msg.p >= 0.95) {
               if (scrollSaveTimerRef.current) clearTimeout(scrollSaveTimerRef.current);
