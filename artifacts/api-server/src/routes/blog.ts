@@ -118,6 +118,7 @@ const CONTENT_TTL = 15 * 60 * 1000;
 
 const CONTENT_DISK_CACHE_DIR = path.resolve(__dirname, "../../data/cache/content");
 const CONTENT_DISK_TTL = 24 * 60 * 60 * 1000;
+const CONTENT_DISK_MAX_ENTRIES = 200;
 
 function contentDiskCacheKey(url: string): string {
   return url
@@ -135,7 +136,10 @@ function loadContentCacheFromDisk(): void {
     fs.mkdirSync(CONTENT_DISK_CACHE_DIR, { recursive: true });
     const files = fs.readdirSync(CONTENT_DISK_CACHE_DIR).filter((f) => f.endsWith(".json"));
     const now = Date.now();
-    let loaded = 0;
+
+    type ValidEntry = { url: string; html: string; ts: number; file: string };
+    const valid: ValidEntry[] = [];
+
     for (const file of files) {
       try {
         const raw = fs.readFileSync(path.join(CONTENT_DISK_CACHE_DIR, file), "utf8");
@@ -148,11 +152,7 @@ function loadContentCacheFromDisk(): void {
           Number.isFinite(entry.ts)
         ) {
           if (now - entry.ts < CONTENT_DISK_TTL) {
-            // Clamp ts to appear freshly loaded so fetchPostContent serves
-            // from memory immediately after restart (same pattern as post-list
-            // disk cache). A background re-fetch will happen after CONTENT_TTL.
-            contentCache.set(entry.url, { html: entry.html, ts: now });
-            loaded++;
+            valid.push({ url: entry.url, html: entry.html, ts: entry.ts, file });
           } else {
             fs.unlink(path.join(CONTENT_DISK_CACHE_DIR, file), () => {});
           }
@@ -161,8 +161,26 @@ function loadContentCacheFromDisk(): void {
         logger.warn({ file, err: fileErr }, "blog: skipping corrupt content cache file");
       }
     }
-    if (loaded > 0) {
-      logger.info({ loaded }, "blog: content cache pre-warmed from disk");
+
+    valid.sort((a, b) => b.ts - a.ts);
+
+    const evicted = valid.length > CONTENT_DISK_MAX_ENTRIES ? valid.length - CONTENT_DISK_MAX_ENTRIES : 0;
+    if (evicted > 0) {
+      const toDelete = valid.splice(CONTENT_DISK_MAX_ENTRIES);
+      for (const e of toDelete) {
+        fs.unlink(path.join(CONTENT_DISK_CACHE_DIR, e.file), () => {});
+      }
+    }
+
+    for (const e of valid) {
+      // Clamp ts to appear freshly loaded so fetchPostContent serves from
+      // memory immediately after restart. A background re-fetch will happen
+      // after CONTENT_TTL (same pattern as the post-list disk cache).
+      contentCache.set(e.url, { html: e.html, ts: now });
+    }
+
+    if (valid.length > 0) {
+      logger.info({ loaded: valid.length, evicted }, "blog: content cache pre-warmed from disk");
     }
   } catch (err) {
     logger.warn({ err }, "blog: failed to load content disk cache");
