@@ -144,10 +144,8 @@ export default function MoreScreen() {
 
   const displayedHistory = useMemo(() => {
     const q = historyQuery.trim().toLowerCase();
-    const filtered = q
-      ? history.filter((e) => e.title.toLowerCase().includes(q))
-      : history.slice(0, 10);
-    return filtered;
+    if (q) return history.filter((e) => e.title.toLowerCase().includes(q));
+    return history;
   }, [history, historyQuery]);
 
   const allKnownCategories = useMemo(() => {
