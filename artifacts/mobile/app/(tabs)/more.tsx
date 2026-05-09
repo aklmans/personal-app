@@ -564,6 +564,9 @@ export default function MoreScreen() {
               </Text>
             </View>
           </View>
+          <Text style={[styles.statsResetHint, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}>
+            {isZh ? "清除阅读记录即可重置统计数据" : "Clear reading history to reset stats"}
+          </Text>
         </View>
       )}
 
@@ -584,7 +587,7 @@ export default function MoreScreen() {
               style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
             >
               <Text style={[styles.clearBtn, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}>
-                {isZh ? "清除" : "Clear"}
+                {isZh ? "清除记录与统计" : "Clear history & stats"}
               </Text>
             </Pressable>
           )}
@@ -1179,6 +1182,11 @@ const styles = StyleSheet.create({
     fontSize: 11,
     textAlign: "center",
     lineHeight: 15,
+  },
+  statsResetHint: {
+    fontSize: 12,
+    textAlign: "center",
+    marginTop: 8,
   },
   sortToggle: {
     flexDirection: "row",
