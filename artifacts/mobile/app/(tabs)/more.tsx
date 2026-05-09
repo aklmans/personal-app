@@ -192,7 +192,14 @@ export default function MoreScreen() {
   const readingStats = useMemo(() => {
     const totalArticles = history.length;
     const totalMinutes = history.reduce((sum, e) => sum + (e.readingTime ?? 0), 0);
-    return { totalArticles, totalMinutes };
+    const catCounts: Record<string, number> = {};
+    for (const e of history) {
+      const cat = e.categories?.[0];
+      if (cat) catCounts[cat] = (catCounts[cat] ?? 0) + 1;
+    }
+    const topCategory =
+      Object.keys(catCounts).sort((a, b) => catCounts[b] - catCounts[a])[0] ?? null;
+    return { totalArticles, totalMinutes, topCategory };
   }, [history]);
 
   const openUrl = useCallback(async (url: string) => {
@@ -530,7 +537,7 @@ export default function MoreScreen() {
                 {isZh ? "已读文章" : "Articles Read"}
               </Text>
             </View>
-            <View style={styles.statItem}>
+            <View style={[styles.statItem, { borderRightColor: colors.border }]}>
               <View style={[styles.statIconWrap, { backgroundColor: colors.secondary }]}>
                 <Feather name="clock" size={18} color={colors.primary} />
               </View>
@@ -539,6 +546,21 @@ export default function MoreScreen() {
               </Text>
               <Text style={[styles.statLabel, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}>
                 {isZh ? "预计分钟" : "Est. Minutes"}
+              </Text>
+            </View>
+            <View style={styles.statItem}>
+              <View style={[styles.statIconWrap, { backgroundColor: colors.secondary }]}>
+                <Feather name="tag" size={18} color={colors.primary} />
+              </View>
+              <Text
+                style={[styles.statValue, { color: colors.text, fontFamily: fonts.serif.bold, fontSize: readingStats.topCategory && readingStats.topCategory.length > 8 ? 16 : 26 }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+              >
+                {readingStats.topCategory ?? "—"}
+              </Text>
+              <Text style={[styles.statLabel, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}>
+                {isZh ? "最多分类" : "Top Category"}
               </Text>
             </View>
           </View>
