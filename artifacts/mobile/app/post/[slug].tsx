@@ -941,6 +941,8 @@ export default function PostDetailScreen() {
   const progressAnim = useRef(new Animated.Value(0)).current;
   const webViewRef = useRef<WebView>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const iframeScrollHandlerRef = useRef<(() => void) | null>(null);
+  const iframeContentWindowRef = useRef<Window | null>(null);
   const recordedKeyRef = useRef<string | null>(null);
   const scrollSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const restoredKeyRef = useRef<string | null>(null);
@@ -1132,6 +1134,11 @@ export default function PostDetailScreen() {
   useEffect(() => {
     return () => {
       if (scrollSaveTimerRef.current) clearTimeout(scrollSaveTimerRef.current);
+      if (iframeScrollHandlerRef.current && iframeContentWindowRef.current) {
+        iframeContentWindowRef.current.removeEventListener("scroll", iframeScrollHandlerRef.current);
+        iframeScrollHandlerRef.current = null;
+        iframeContentWindowRef.current = null;
+      }
     };
   }, []);
 
@@ -1270,6 +1277,12 @@ export default function PostDetailScreen() {
   const onIframeLoad = useCallback(() => {
     const iframe = iframeRef.current;
     if (!iframe?.contentWindow) return;
+    // Remove any previous scroll listener before attaching a new one
+    if (iframeScrollHandlerRef.current && iframeContentWindowRef.current) {
+      iframeContentWindowRef.current.removeEventListener("scroll", iframeScrollHandlerRef.current);
+      iframeScrollHandlerRef.current = null;
+      iframeContentWindowRef.current = null;
+    }
     const cw = iframe.contentWindow;
     if (scrollStorageKey && restoredKeyRef.current !== scrollStorageKey) {
       restoredKeyRef.current = scrollStorageKey;
@@ -1305,6 +1318,8 @@ export default function PostDetailScreen() {
       });
     };
     cw.addEventListener("scroll", handleScroll, { passive: true });
+    iframeScrollHandlerRef.current = handleScroll;
+    iframeContentWindowRef.current = cw;
   }, [scrollStorageKey, webScrollToPos, progressAnim]);
 
   const restoreScrollPosition = useCallback(async () => {
