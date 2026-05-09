@@ -746,6 +746,7 @@ function buildHtml(
       max-width: ${bodyMaxWidth};
       word-wrap: break-word;
       overflow-x: hidden;
+      transition: background-color 0.25s, color 0.25s;
     }
     h1, h2, h3, h4, h5, h6 {
       font-family: ${fontFamily === "sans" ? "'Inter', system-ui, sans-serif" : "'Lora', Georgia, serif"};
@@ -1248,7 +1249,7 @@ export default function PostDetailScreen() {
     if (Platform.OS !== "web" && webViewRef.current) {
       const { bg, text } = resolveThemeColors(colorTheme, colors.background, colors.text);
       webViewRef.current.injectJavaScript(
-        `document.body.style.backgroundColor='${bg}';document.body.style.color='${text}';document.documentElement.style.backgroundColor='${bg}';true;`
+        `document.body.style.transition='background-color 0.25s, color 0.25s';document.body.style.backgroundColor='${bg}';document.body.style.color='${text}';document.documentElement.style.backgroundColor='${bg}';true;`
       );
     }
   }, [colorTheme, colors.background, colors.text]);
