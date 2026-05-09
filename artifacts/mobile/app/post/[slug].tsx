@@ -973,7 +973,6 @@ export default function PostDetailScreen() {
   const isDismissingBannerRef = useRef(false);
   const bannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bannerSwipeDy = useRef(new Animated.Value(0)).current;
-  const bannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bannerPanResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gs) =>
