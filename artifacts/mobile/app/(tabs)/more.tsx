@@ -110,6 +110,12 @@ export default function MoreScreen() {
     }
   }, [bookmarkCategories, activeCategory]);
 
+  const readingStats = useMemo(() => {
+    const totalArticles = history.length;
+    const totalMinutes = history.reduce((sum, e) => sum + (e.readingTime ?? 0), 0);
+    return { totalArticles, totalMinutes };
+  }, [history]);
+
   const openUrl = useCallback(async (url: string) => {
     await WebBrowser.openBrowserAsync(url);
   }, []);
@@ -397,6 +403,43 @@ export default function MoreScreen() {
           ))
         )}
       </View>
+
+      {readingStats.totalArticles > 0 && (
+        <View style={[styles.section, { marginTop: 24 }]}>
+          <Text
+            style={[
+              styles.sectionLabel,
+              { color: colors.mutedForeground, fontFamily: fonts.sans.semiBold },
+            ]}
+          >
+            {isZh ? "阅读统计" : "READING STATS"}
+          </Text>
+          <View style={[styles.statsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[styles.statItem, { borderRightColor: colors.border }]}>
+              <View style={[styles.statIconWrap, { backgroundColor: colors.secondary }]}>
+                <Feather name="book-open" size={18} color={colors.primary} />
+              </View>
+              <Text style={[styles.statValue, { color: colors.text, fontFamily: fonts.serif.bold }]}>
+                {readingStats.totalArticles}
+              </Text>
+              <Text style={[styles.statLabel, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}>
+                {isZh ? "已读文章" : "Articles Read"}
+              </Text>
+            </View>
+            <View style={styles.statItem}>
+              <View style={[styles.statIconWrap, { backgroundColor: colors.secondary }]}>
+                <Feather name="clock" size={18} color={colors.primary} />
+              </View>
+              <Text style={[styles.statValue, { color: colors.text, fontFamily: fonts.serif.bold }]}>
+                {readingStats.totalMinutes > 0 ? `${readingStats.totalMinutes}` : "—"}
+              </Text>
+              <Text style={[styles.statLabel, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}>
+                {isZh ? "预计分钟" : "Est. Minutes"}
+              </Text>
+            </View>
+          </View>
+        </View>
+      )}
 
       <View style={[styles.section, { marginTop: 24 }]}>
         <View style={styles.sectionHeader}>
@@ -873,6 +916,38 @@ const styles = StyleSheet.create({
   },
   bookmarkMeta: {
     fontSize: 12,
+  },
+  statsCard: {
+    flexDirection: "row",
+    borderRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: "hidden",
+  },
+  statItem: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 16,
+    paddingHorizontal: 8,
+    gap: 6,
+    borderRightWidth: StyleSheet.hairlineWidth,
+  },
+  statIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 2,
+  },
+  statValue: {
+    fontSize: 26,
+    letterSpacing: -0.5,
+    lineHeight: 30,
+  },
+  statLabel: {
+    fontSize: 11,
+    textAlign: "center",
+    lineHeight: 15,
   },
   sortToggle: {
     flexDirection: "row",
