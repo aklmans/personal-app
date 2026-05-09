@@ -149,7 +149,7 @@ export default function MoreScreen() {
     useCallback(() => {
       refreshAvailableCategories();
       clearBadge();
-      return () => { setSearchQuery(""); setHistoryQuery(""); };
+      return () => { setSearchQuery(""); };
     }, [refreshAvailableCategories, clearBadge])
   );
 
