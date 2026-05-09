@@ -201,9 +201,9 @@ export default function MoreScreen() {
       const cat = e.categories?.[0];
       if (cat) catCounts[cat] = (catCounts[cat] ?? 0) + 1;
     }
-    const topCategory =
-      Object.keys(catCounts).sort((a, b) => catCounts[b] - catCounts[a])[0] ?? null;
-    return { totalArticles, totalMinutes, topCategory };
+    const topCategories =
+      Object.keys(catCounts).sort((a, b) => catCounts[b] - catCounts[a]).slice(0, 3);
+    return { totalArticles, totalMinutes, topCategories };
   }, [history]);
 
   const openUrl = useCallback(async (url: string) => {
@@ -558,11 +558,11 @@ export default function MoreScreen() {
                 <Feather name="tag" size={18} color={colors.primary} />
               </View>
               <Text
-                style={[styles.statValue, { color: colors.text, fontFamily: fonts.serif.bold, fontSize: readingStats.topCategory && readingStats.topCategory.length > 8 ? 16 : 26 }]}
-                numberOfLines={1}
+                style={[styles.statValue, { color: colors.text, fontFamily: fonts.serif.bold, fontSize: readingStats.topCategories.length > 0 && readingStats.topCategories[0].length > 8 ? 16 : 26 }]}
+                numberOfLines={2}
                 adjustsFontSizeToFit
               >
-                {readingStats.topCategory ?? "—"}
+                {readingStats.topCategories.length > 0 ? readingStats.topCategories.join(" · ") : "—"}
               </Text>
               <Text style={[styles.statLabel, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}>
                 {isZh ? "最多分类" : "Top Category"}
