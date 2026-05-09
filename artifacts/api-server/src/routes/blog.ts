@@ -859,6 +859,12 @@ async function revalidateStaleContent(): Promise<void> {
   logger.info({ count: staleUrls.length }, "blog: content revalidation complete");
 }
 
+// Recurring revalidation interval handle — stored so it can be cleared on
+// module teardown and never leaks if the module is ever reloaded.
+let _revalidateInterval: ReturnType<typeof setInterval> | null = null;
+
+const CONTENT_REVALIDATE_INTERVAL = 12 * 60 * 60 * 1000; // 12 hours
+
 function warmCache(): void {
   for (const locale of Object.keys(RSS_FEEDS)) {
     doFetchFeed(locale).catch(() => {});
@@ -870,6 +876,31 @@ function warmCache(): void {
       logger.warn({ err }, "blog: content revalidation failed")
     );
   }, 5000);
+
+  // Clear any existing interval before registering a new one so this function
+  // is safe to call more than once without leaking handles.
+  if (_revalidateInterval !== null) {
+    clearInterval(_revalidateInterval);
+    logger.info("blog: cleared previous content revalidation interval");
+  }
+  _revalidateInterval = setInterval(() => {
+    revalidateStaleContent().catch((err) =>
+      logger.warn({ err }, "blog: periodic content revalidation failed")
+    );
+  }, CONTENT_REVALIDATE_INTERVAL);
+  logger.info({ intervalMs: CONTENT_REVALIDATE_INTERVAL }, "blog: content revalidation interval registered");
+}
+
+/**
+ * Cancel the recurring content-revalidation timer. Call this during server
+ * shutdown or hot-module teardown to prevent handle leaks.
+ */
+export function disposeBlogCacheTimers(): void {
+  if (_revalidateInterval !== null) {
+    clearInterval(_revalidateInterval);
+    _revalidateInterval = null;
+    logger.info("blog: content revalidation interval cleared (dispose)");
+  }
 }
 
 router.get("/posts", async (req, res) => {
