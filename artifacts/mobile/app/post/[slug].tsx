@@ -995,6 +995,10 @@ export default function PostDetailScreen() {
     [colorTheme, colors.background, colors.text]
   );
 
+  const themeIconMuted = colorTheme === "default"
+    ? colors.mutedForeground
+    : `${themeColors.text}70`;
+
   const showCopyToast = useCallback(() => {
     if (copyToastTimerRef.current) clearTimeout(copyToastTimerRef.current);
     copyToastAnim.stopAnimation();
@@ -1078,7 +1082,7 @@ export default function PostDetailScreen() {
               accessibilityLabel="Reading preferences"
               accessibilityRole="button"
             >
-              <Feather name="sliders" size={18} color={colors.mutedForeground} />
+              <Feather name="sliders" size={18} color={themeColors.text} />
             </Pressable>
             {post && (
               <Pressable
@@ -1104,7 +1108,7 @@ export default function PostDetailScreen() {
                 <Feather
                   name="bookmark"
                   size={20}
-                  color={bookmarked ? colors.primary : colors.mutedForeground}
+                  color={bookmarked ? colors.primary : themeColors.text}
                 />
               </Pressable>
             )}
@@ -1114,7 +1118,7 @@ export default function PostDetailScreen() {
               canDecrease={canDecrease}
               canIncrease={canIncrease}
               primaryColor={colors.primary}
-              mutedColor={colors.mutedForeground}
+              mutedColor={themeIconMuted}
             />
             {post && (
               <Pressable
@@ -1124,7 +1128,7 @@ export default function PostDetailScreen() {
                 accessibilityLabel="Share article"
                 accessibilityRole="button"
               >
-                <Feather name="share-2" size={20} color={colors.mutedForeground} />
+                <Feather name="share-2" size={20} color={themeColors.text} />
               </Pressable>
             )}
           </View>
