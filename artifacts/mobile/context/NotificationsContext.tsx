@@ -77,6 +77,20 @@ async function registerToken(token: string, locale: string, categories: string[]
   }
 }
 
+async function clearBadge(token: string | null): Promise<void> {
+  Notifications.setBadgeCountAsync(0).catch(() => {});
+  if (!token) return;
+  try {
+    await fetch(`${API_BASE}/notifications/clear-badge`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    });
+  } catch {
+    // best-effort
+  }
+}
+
 async function unregisterToken(token: string): Promise<void> {
   try {
     await fetch(`${API_BASE}/notifications/unregister`, {
@@ -131,8 +145,8 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   const router = useRouter();
   const { locale } = useLanguage();
   const notificationResponseListener = useRef<Notifications.EventSubscription | null>(null);
-  const notificationReceivedListener = useRef<Notifications.EventSubscription | null>(null);
   const coldStartHandled = useRef(false);
+  const pushTokenRef = useRef<string | null>(null);
 
   useEffect(() => {
     fetchAvailableCategories();
@@ -150,6 +164,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
               .then(async (storedToken) => {
                 const currentToken = await getPushToken();
                 if (!currentToken) return;
+                pushTokenRef.current = currentToken;
                 const registered = await registerToken(currentToken, locale, cats);
                 if (registered && storedToken && storedToken !== currentToken) {
                   await unregisterToken(storedToken);
@@ -186,17 +201,11 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
               locale?: string;
             };
             navigateToPost(router, data);
-            Notifications.setBadgeCountAsync(0).catch(() => {});
+            clearBadge(pushTokenRef.current).catch(() => {});
           }
         })
         .catch(() => {});
     }
-
-    notificationReceivedListener.current = Notifications.addNotificationReceivedListener(() => {
-      Notifications.getBadgeCountAsync()
-        .then((count) => Notifications.setBadgeCountAsync(count + 1))
-        .catch(() => {});
-    });
 
     notificationResponseListener.current = Notifications.addNotificationResponseReceivedListener(
       (response) => {
@@ -205,18 +214,17 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
           locale?: string;
         };
         navigateToPost(router, data);
-        Notifications.setBadgeCountAsync(0).catch(() => {});
+        clearBadge(pushTokenRef.current).catch(() => {});
       }
     );
 
     const appStateSub = AppState.addEventListener("change", (nextState) => {
       if (nextState === "active") {
-        Notifications.setBadgeCountAsync(0).catch(() => {});
+        clearBadge(pushTokenRef.current).catch(() => {});
       }
     });
 
     return () => {
-      notificationReceivedListener.current?.remove();
       notificationResponseListener.current?.remove();
       appStateSub.remove();
     };
@@ -248,6 +256,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       }
 
       await AsyncStorage.setItem(STORAGE_TOKEN_KEY, token);
+      pushTokenRef.current = token;
       setOptedIn(true);
       await AsyncStorage.setItem(STORAGE_KEY, "true");
     } catch {

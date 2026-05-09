@@ -25,6 +25,7 @@ const registeredTokens = new Map<string, { locale: string; categories: string[] 
 
 const knownPostSlugs = new Set<string>();
 const knownCategories = new Set<string>();
+const unreadCounts = new Map<string, number>();
 let initialized = false;
 
 let _sitemapUrlsCache: { urls: string[]; ts: number } | null = null;
@@ -195,6 +196,7 @@ async function sendExpoPushNotifications(messages: object[]): Promise<void> {
               const token = tokensInChunk[i];
               if (token && registeredTokens.has(token)) {
                 registeredTokens.delete(token);
+                unreadCounts.delete(token);
                 tokensInvalidated = true;
                 logger.info({ tokenPrefix: token.slice(0, 16) }, "Removed invalid push token");
               }
@@ -264,14 +266,18 @@ async function pollAndNotify(): Promise<void> {
 
     if (matchingTokens.length === 0) continue;
 
-    const messages = matchingTokens.map((token) => ({
-      to: token,
-      title: "New post on aklman",
-      body: post.title || "A new article has been published",
-      data: { slug: post.slug, locale: post.locale },
-      sound: "default",
-      badge: 1,
-    }));
+    const messages = matchingTokens.map((token) => {
+      const newCount = (unreadCounts.get(token) ?? 0) + 1;
+      unreadCounts.set(token, newCount);
+      return {
+        to: token,
+        title: "New post on aklman",
+        body: post.title || "A new article has been published",
+        data: { slug: post.slug, locale: post.locale },
+        sound: "default",
+        badge: newCount,
+      };
+    });
     await sendExpoPushNotifications(messages);
   }
 }
@@ -314,8 +320,17 @@ router.post("/register", async (req, res) => {
         .filter(Boolean)
     : [];
   registeredTokens.set(token, { locale: resolvedLocale, categories: resolvedCategories });
+  unreadCounts.set(token, 0);
   await saveTokensToDisk();
   logger.info({ tokenCount: registeredTokens.size, locale: resolvedLocale, categoryCount: resolvedCategories.length }, "Push token registered");
+  res.json({ ok: true });
+});
+
+router.post("/clear-badge", (req, res) => {
+  const { token } = req.body as { token?: string };
+  if (token && typeof token === "string") {
+    unreadCounts.set(token, 0);
+  }
   res.json({ ok: true });
 });
 
@@ -326,6 +341,7 @@ router.post("/unregister", async (req, res) => {
     return;
   }
   registeredTokens.delete(token);
+  unreadCounts.delete(token);
   await saveTokensToDisk();
   logger.info({ tokenCount: registeredTokens.size }, "Push token unregistered");
   res.json({ ok: true });
