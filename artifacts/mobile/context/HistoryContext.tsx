@@ -41,8 +41,20 @@ export function HistoryProvider({ children }: { children: React.ReactNode }) {
     AsyncStorage.getItem(STORAGE_KEY)
       .then((raw) => {
         if (raw) {
-          const parsed = JSON.parse(raw) as HistoryEntry[];
-          if (Array.isArray(parsed)) setHistory(parsed);
+          const parsed = JSON.parse(raw) as Array<PostData & { visitedAt?: string }>;
+          if (Array.isArray(parsed)) {
+            const fallback = new Date().toISOString();
+            const migrated: HistoryEntry[] = parsed.map((entry) => ({
+              ...entry,
+              visitedAt:
+                entry.visitedAt && !isNaN(Date.parse(entry.visitedAt))
+                  ? entry.visitedAt
+                  : entry.pubDate && !isNaN(Date.parse(entry.pubDate))
+                  ? entry.pubDate
+                  : fallback,
+            }));
+            setHistory(migrated);
+          }
         }
       })
       .catch(() => {});
