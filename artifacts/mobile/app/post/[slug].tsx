@@ -661,6 +661,7 @@ function buildInjectedJS(
   document.body.style.color = '${text}';
   document.documentElement.style.backgroundColor = '${bg}';
   document.documentElement.style.setProperty('--highlight-color', '${highlightColor}');
+  document.documentElement.style.setProperty('--theme-bg', '${bg}');
   function send() {
     var el = document.documentElement;
     var top = el.scrollTop || document.body.scrollTop || 0;
@@ -849,7 +850,7 @@ function buildHtml(
   <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="${prismCssUrl}">
   <style>
-    :root { --highlight-color: ${highlightColor}; }
+    :root { --highlight-color: ${highlightColor}; --theme-bg: ${bg}; }
     * { box-sizing: border-box; }
     html { font-size: ${fontSize}px; -webkit-text-size-adjust: 100%; }
     body {
@@ -1038,7 +1039,7 @@ function buildHtml(
 <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
 <script>${highlightScript}</script>
 <script>(function(){var selTimer;document.addEventListener('selectionchange',function(){clearTimeout(selTimer);selTimer=setTimeout(function(){var sel=window.getSelection?window.getSelection().toString().trim():'';window.parent.postMessage(JSON.stringify({t:'selection',text:sel}),'*');},300);});})()</script>
-<script>(function(){window.addEventListener('message',function(e){if(e.source!==window.parent)return;try{var d=JSON.parse(e.data);}catch(err){return;}if(d.t!=='highlight')return;var hc=getComputedStyle(document.documentElement).getPropertyValue('--highlight-color').trim()||'rgba(218,119,86,0.35)';var sel=window.getSelection();if(!sel||sel.rangeCount===0)return;var range=sel.getRangeAt(0);var mark=document.createElement('span');mark.style.cssText='background:'+hc+';border-radius:2px;transition:background 1.5s ease-out';try{var frag=range.extractContents();mark.appendChild(frag);range.insertNode(mark);sel.removeAllRanges();setTimeout(function(){mark.style.background='transparent';setTimeout(function(){var p=mark.parentNode;if(p){while(mark.firstChild)p.insertBefore(mark.firstChild,mark);p.removeChild(mark);}},1500);},50);}catch(err){document.body.style.transition='background 0.3s ease';document.body.style.background=hc;setTimeout(function(){document.body.style.background='';},700);}});})()</script>
+<script>(function(){window.addEventListener('message',function(e){if(e.source!==window.parent)return;try{var d=JSON.parse(e.data);}catch(err){return;}if(d.t!=='highlight')return;var hc=getComputedStyle(document.documentElement).getPropertyValue('--highlight-color').trim()||'rgba(218,119,86,0.35)';var tbg=getComputedStyle(document.documentElement).getPropertyValue('--theme-bg').trim()||'transparent';var sel=window.getSelection();if(!sel||sel.rangeCount===0)return;var range=sel.getRangeAt(0);var mark=document.createElement('span');mark.style.cssText='background:'+hc+';border-radius:2px;transition:background 1.5s ease-out';try{var frag=range.extractContents();mark.appendChild(frag);range.insertNode(mark);sel.removeAllRanges();setTimeout(function(){mark.style.background=tbg;setTimeout(function(){var p=mark.parentNode;if(p){while(mark.firstChild)p.insertBefore(mark.firstChild,mark);p.removeChild(mark);}},1500);},50);}catch(err){document.body.style.transition='background 0.3s ease';document.body.style.background=hc;setTimeout(function(){document.body.style.background=tbg;},700);}});})()</script>
 </body>
 </html>`;
 }
@@ -1186,7 +1187,7 @@ export default function PostDetailScreen() {
       setSelectedQuote("");
       return;
     }
-    const injectQuoteHighlight = `(function(){var hc=getComputedStyle(document.documentElement).getPropertyValue('--highlight-color').trim()||'rgba(218,119,86,0.35)';var sel=window.getSelection();if(!sel||sel.rangeCount===0)return;var range=sel.getRangeAt(0);var mark=document.createElement('span');mark.style.cssText='background:'+hc+';border-radius:2px;transition:background 1.5s ease-out';try{var frag=range.extractContents();mark.appendChild(frag);range.insertNode(mark);sel.removeAllRanges();setTimeout(function(){mark.style.background='transparent';setTimeout(function(){var p=mark.parentNode;if(p){while(mark.firstChild)p.insertBefore(mark.firstChild,mark);p.removeChild(mark);}},1500);},50);}catch(err){document.body.style.transition='background 0.3s ease';document.body.style.background=hc;setTimeout(function(){document.body.style.background='';},700);}})();true;`;
+    const injectQuoteHighlight = `(function(){var hc=getComputedStyle(document.documentElement).getPropertyValue('--highlight-color').trim()||'rgba(218,119,86,0.35)';var tbg=getComputedStyle(document.documentElement).getPropertyValue('--theme-bg').trim()||'transparent';var sel=window.getSelection();if(!sel||sel.rangeCount===0)return;var range=sel.getRangeAt(0);var mark=document.createElement('span');mark.style.cssText='background:'+hc+';border-radius:2px;transition:background 1.5s ease-out';try{var frag=range.extractContents();mark.appendChild(frag);range.insertNode(mark);sel.removeAllRanges();setTimeout(function(){mark.style.background=tbg;setTimeout(function(){var p=mark.parentNode;if(p){while(mark.firstChild)p.insertBefore(mark.firstChild,mark);p.removeChild(mark);}},1500);},50);}catch(err){document.body.style.transition='background 0.3s ease';document.body.style.background=hc;setTimeout(function(){document.body.style.background=tbg;},700);}})();true;`;
     try {
       const result = await Share.share(
         Platform.OS === "ios"
@@ -1494,6 +1495,7 @@ export default function PostDetailScreen() {
         `document.body.style.color='${text}';` +
         `document.documentElement.style.backgroundColor='${bg}';` +
         `document.documentElement.style.setProperty('--highlight-color','${highlightColor}');` +
+        `document.documentElement.style.setProperty('--theme-bg','${bg}');` +
         `var headings=document.querySelectorAll('h1,h2,h3,h4,h5,h6');` +
         `for(var i=0;i<headings.length;i++){headings[i].style.transition='color 0.25s';headings[i].style.color='${text}';}` +
         `var links=document.querySelectorAll('a');` +
