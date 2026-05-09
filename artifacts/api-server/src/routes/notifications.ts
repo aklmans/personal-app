@@ -270,6 +270,7 @@ async function pollAndNotify(): Promise<void> {
       body: post.title || "A new article has been published",
       data: { slug: post.slug, locale: post.locale },
       sound: "default",
+      badge: 1,
     }));
     await sendExpoPushNotifications(messages);
   }

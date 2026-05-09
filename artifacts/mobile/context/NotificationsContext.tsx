@@ -8,7 +8,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { Platform } from "react-native";
+import { AppState, Platform } from "react-native";
 import { useRouter } from "expo-router";
 import { useLanguage } from "./LanguageContext";
 
@@ -25,7 +25,7 @@ Notifications.setNotificationHandler({
     shouldShowBanner: true,
     shouldShowList: true,
     shouldPlaySound: true,
-    shouldSetBadge: false,
+    shouldSetBadge: true,
   }),
 });
 
@@ -131,6 +131,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   const router = useRouter();
   const { locale } = useLanguage();
   const notificationResponseListener = useRef<Notifications.EventSubscription | null>(null);
+  const notificationReceivedListener = useRef<Notifications.EventSubscription | null>(null);
   const coldStartHandled = useRef(false);
 
   useEffect(() => {
@@ -185,10 +186,17 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
               locale?: string;
             };
             navigateToPost(router, data);
+            Notifications.setBadgeCountAsync(0).catch(() => {});
           }
         })
         .catch(() => {});
     }
+
+    notificationReceivedListener.current = Notifications.addNotificationReceivedListener(() => {
+      Notifications.getBadgeCountAsync()
+        .then((count) => Notifications.setBadgeCountAsync(count + 1))
+        .catch(() => {});
+    });
 
     notificationResponseListener.current = Notifications.addNotificationResponseReceivedListener(
       (response) => {
@@ -197,11 +205,20 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
           locale?: string;
         };
         navigateToPost(router, data);
+        Notifications.setBadgeCountAsync(0).catch(() => {});
       }
     );
 
+    const appStateSub = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "active") {
+        Notifications.setBadgeCountAsync(0).catch(() => {});
+      }
+    });
+
     return () => {
+      notificationReceivedListener.current?.remove();
       notificationResponseListener.current?.remove();
+      appStateSub.remove();
     };
   }, [router, locale]);
 
