@@ -19,9 +19,9 @@ const POLL_INTERVAL_MS = 10 * 60 * 1000;
 
 const TOKENS_FILE = join(process.cwd(), "data", "push-tokens.json");
 
-type TokenRecord = { token: string; locale: string; categories: string[] };
+type TokenRecord = { token: string; locale: string; categories: string[]; mutedSlugs: string[] };
 
-const registeredTokens = new Map<string, { locale: string; categories: string[] }>();
+const registeredTokens = new Map<string, { locale: string; categories: string[]; mutedSlugs: string[] }>();
 
 const knownPostSlugs = new Set<string>();
 const knownCategories = new Set<string>();
@@ -41,12 +41,13 @@ async function loadTokensFromDisk(): Promise<void> {
     if (Array.isArray(parsed)) {
       for (const item of parsed) {
         if (typeof item === "string") {
-          registeredTokens.set(item, { locale: "en", categories: [] });
+          registeredTokens.set(item, { locale: "en", categories: [], mutedSlugs: [] });
         } else if (item && typeof item === "object" && typeof (item as TokenRecord).token === "string") {
           const r = item as TokenRecord;
           registeredTokens.set(r.token, {
             locale: r.locale ?? "en",
             categories: Array.isArray(r.categories) ? r.categories : [],
+            mutedSlugs: Array.isArray(r.mutedSlugs) ? r.mutedSlugs : [],
           });
         }
       }
@@ -61,7 +62,7 @@ async function saveTokensToDisk(): Promise<void> {
   try {
     await mkdir(join(process.cwd(), "data"), { recursive: true });
     const records: TokenRecord[] = Array.from(registeredTokens.entries()).map(
-      ([token, { locale, categories }]) => ({ token, locale, categories })
+      ([token, { locale, categories, mutedSlugs }]) => ({ token, locale, categories, mutedSlugs })
     );
     await writeFile(TOKENS_FILE, JSON.stringify(records), "utf-8");
   } catch (err) {
@@ -258,6 +259,7 @@ async function pollAndNotify(): Promise<void> {
     const matchingTokens = Array.from(registeredTokens.entries())
       .filter(([, rec]) => {
         if (rec.locale !== post.locale) return false;
+        if (rec.mutedSlugs.includes(post.slug)) return false;
         if (rec.categories.length === 0) return true;
         if (post.categories.length === 0) return true;
         return post.categories.some((c) => rec.categories.includes(c));
@@ -307,7 +309,12 @@ router.get("/categories", (_req, res) => {
 });
 
 router.post("/register", async (req, res) => {
-  const { token, locale, categories } = req.body as { token?: string; locale?: string; categories?: unknown };
+  const { token, locale, categories, mutedSlugs } = req.body as {
+    token?: string;
+    locale?: string;
+    categories?: unknown;
+    mutedSlugs?: unknown;
+  };
   if (!token || typeof token !== "string" || !isValidExpoToken(token)) {
     res.status(400).json({ error: "valid Expo push token is required" });
     return;
@@ -319,10 +326,43 @@ router.post("/register", async (req, res) => {
         .map((c) => c.trim().toLowerCase())
         .filter(Boolean)
     : [];
-  registeredTokens.set(token, { locale: resolvedLocale, categories: resolvedCategories });
+  const existing = registeredTokens.get(token);
+  const resolvedMutedSlugs: string[] = Array.isArray(mutedSlugs)
+    ? (mutedSlugs as unknown[])
+        .filter((s): s is string => typeof s === "string")
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : (existing?.mutedSlugs ?? []);
+  registeredTokens.set(token, { locale: resolvedLocale, categories: resolvedCategories, mutedSlugs: resolvedMutedSlugs });
   unreadCounts.set(token, 0);
   await saveTokensToDisk();
-  logger.info({ tokenCount: registeredTokens.size, locale: resolvedLocale, categoryCount: resolvedCategories.length }, "Push token registered");
+  logger.info(
+    { tokenCount: registeredTokens.size, locale: resolvedLocale, categoryCount: resolvedCategories.length, mutedCount: resolvedMutedSlugs.length },
+    "Push token registered"
+  );
+  res.json({ ok: true });
+});
+
+router.post("/mute", async (req, res) => {
+  const { token, slug } = req.body as { token?: string; slug?: string };
+  if (!token || typeof token !== "string" || !isValidExpoToken(token)) {
+    res.status(400).json({ error: "valid Expo push token is required" });
+    return;
+  }
+  if (!slug || typeof slug !== "string") {
+    res.status(400).json({ error: "slug is required" });
+    return;
+  }
+  const rec = registeredTokens.get(token);
+  if (!rec) {
+    res.status(404).json({ error: "token not found" });
+    return;
+  }
+  if (!rec.mutedSlugs.includes(slug)) {
+    rec.mutedSlugs.push(slug);
+    await saveTokensToDisk();
+    logger.info({ tokenPrefix: token.slice(0, 16), slug }, "Post muted for token");
+  }
   res.json({ ok: true });
 });
 

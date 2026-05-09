@@ -15,6 +15,7 @@ import { useLanguage } from "./LanguageContext";
 const STORAGE_KEY = "@notifications_opted_in_v1";
 const STORAGE_TOKEN_KEY = "@notifications_push_token_v1";
 const STORAGE_CATEGORIES_KEY = "@notifications_categories_v1";
+const STORAGE_MUTED_SLUGS_KEY = "@notifications_muted_slugs_v1";
 
 const domain = process.env.EXPO_PUBLIC_DOMAIN ?? "localhost:8080";
 const isLocalDev = domain.startsWith("localhost") || domain.startsWith("127.");
@@ -40,6 +41,8 @@ interface NotificationsContextValue {
   availableCategories: string[];
   refreshAvailableCategories: () => void;
   clearBadge: () => void;
+  mutedSlugs: string[];
+  mutePost: (slug: string) => Promise<void>;
 }
 
 const NotificationsContext = createContext<NotificationsContextValue>({
@@ -53,6 +56,8 @@ const NotificationsContext = createContext<NotificationsContextValue>({
   availableCategories: [],
   refreshAvailableCategories: () => {},
   clearBadge: () => {},
+  mutedSlugs: [],
+  mutePost: async () => {},
 });
 
 async function ensureAndroidChannel(): Promise<void> {
@@ -66,12 +71,12 @@ async function ensureAndroidChannel(): Promise<void> {
   });
 }
 
-async function registerToken(token: string, locale: string, categories: string[]): Promise<boolean> {
+async function registerToken(token: string, locale: string, categories: string[], mutedSlugs: string[]): Promise<boolean> {
   try {
     const res = await fetch(`${API_BASE}/notifications/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token, locale, categories }),
+      body: JSON.stringify({ token, locale, categories, mutedSlugs }),
     });
     return res.ok;
   } catch {
@@ -99,6 +104,18 @@ async function unregisterToken(token: string): Promise<void> {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token }),
+    });
+  } catch {
+    // best-effort
+  }
+}
+
+async function muteTokenSlug(token: string, slug: string): Promise<void> {
+  try {
+    await fetch(`${API_BASE}/notifications/mute`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, slug }),
     });
   } catch {
     // best-effort
@@ -134,6 +151,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   const [isLoading, setIsLoading] = useState(false);
   const [notifCategories, setNotifCategoriesState] = useState<string[]>([]);
   const [availableCategories, setAvailableCategories] = useState<string[]>([]);
+  const [mutedSlugs, setMutedSlugsState] = useState<string[]>([]);
   const fetchAvailableCategories = useCallback(() => {
     fetch(`${API_BASE}/notifications/categories`)
       .then((r) => r.json())
@@ -150,6 +168,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   const coldStartHandled = useRef(false);
   const pushTokenRef = useRef<string | null>(null);
   const prevLocaleRef = useRef<string>(locale);
+  const mutedSlugsRef = useRef<string[]>([]);
 
   useEffect(() => {
     fetchAvailableCategories();
@@ -163,16 +182,19 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     AsyncStorage.getItem(STORAGE_TOKEN_KEY)
       .then(async (token) => {
         if (!token) return;
-        await registerToken(token, locale, notifCategories);
+        await registerToken(token, locale, notifCategories, mutedSlugsRef.current);
       })
       .catch(() => {});
   }, [locale, optedIn, notifCategories]);
 
   useEffect(() => {
-    AsyncStorage.multiGet([STORAGE_KEY, STORAGE_CATEGORIES_KEY, STORAGE_TOKEN_KEY])
-      .then(([[, optedInVal], [, categoriesVal]]) => {
+    AsyncStorage.multiGet([STORAGE_KEY, STORAGE_CATEGORIES_KEY, STORAGE_TOKEN_KEY, STORAGE_MUTED_SLUGS_KEY])
+      .then(([[, optedInVal], [, categoriesVal], , [, mutedVal]]) => {
         const cats: string[] = categoriesVal ? (JSON.parse(categoriesVal) as string[]) : [];
+        const muted: string[] = mutedVal ? (JSON.parse(mutedVal) as string[]) : [];
         setNotifCategoriesState(cats);
+        setMutedSlugsState(muted);
+        mutedSlugsRef.current = muted;
         if (optedInVal === "true") {
           setOptedIn(true);
           if (Platform.OS !== "web") {
@@ -181,7 +203,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
                 const currentToken = await getPushToken();
                 if (!currentToken) return;
                 pushTokenRef.current = currentToken;
-                const registered = await registerToken(currentToken, locale, cats);
+                const registered = await registerToken(currentToken, locale, cats, muted);
                 if (registered && storedToken && storedToken !== currentToken) {
                   await unregisterToken(storedToken);
                   await AsyncStorage.setItem(STORAGE_TOKEN_KEY, currentToken);
@@ -269,7 +291,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
         return;
       }
 
-      const registered = await registerToken(token, locale, notifCategories);
+      const registered = await registerToken(token, locale, notifCategories, mutedSlugsRef.current);
       if (!registered) {
         return;
       }
@@ -292,12 +314,31 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       await AsyncStorage.setItem(STORAGE_CATEGORIES_KEY, JSON.stringify(normalized));
       if (optedIn && Platform.OS !== "web") {
         const token = await AsyncStorage.getItem(STORAGE_TOKEN_KEY);
-        if (token) await registerToken(token, locale, normalized);
+        if (token) await registerToken(token, locale, normalized, mutedSlugsRef.current);
       }
     } catch {
       // best-effort
     }
   }, [optedIn, locale]);
+
+  const mutePost = useCallback(async (slug: string) => {
+    const trimmed = slug.trim();
+    if (!trimmed) return;
+    const updated = mutedSlugsRef.current.includes(trimmed)
+      ? mutedSlugsRef.current
+      : [...mutedSlugsRef.current, trimmed];
+    mutedSlugsRef.current = updated;
+    setMutedSlugsState(updated);
+    try {
+      await AsyncStorage.setItem(STORAGE_MUTED_SLUGS_KEY, JSON.stringify(updated));
+      if (optedIn && Platform.OS !== "web") {
+        const token = await AsyncStorage.getItem(STORAGE_TOKEN_KEY);
+        if (token) await muteTokenSlug(token, trimmed);
+      }
+    } catch {
+      // best-effort
+    }
+  }, [optedIn]);
 
   const clearBadgeCallback = useCallback(() => {
     clearBadge(pushTokenRef.current).catch(() => {});
@@ -322,7 +363,20 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
 
   return (
     <NotificationsContext.Provider
-      value={{ optedIn, permissionStatus, isLoading, enable, disable, notifCategories, setNotifCategories, availableCategories, refreshAvailableCategories: fetchAvailableCategories, clearBadge: clearBadgeCallback }}
+      value={{
+        optedIn,
+        permissionStatus,
+        isLoading,
+        enable,
+        disable,
+        notifCategories,
+        setNotifCategories,
+        availableCategories,
+        refreshAvailableCategories: fetchAvailableCategories,
+        clearBadge: clearBadgeCallback,
+        mutedSlugs,
+        mutePost,
+      }}
     >
       {children}
     </NotificationsContext.Provider>

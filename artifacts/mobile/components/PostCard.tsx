@@ -1,6 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import React from "react";
 import {
+  Alert,
   Image,
   Pressable,
   StyleSheet,
@@ -11,6 +12,7 @@ import {
 import { fonts } from "@/constants/fonts";
 import { useBookmarks } from "@/context/BookmarksContext";
 import { useHistory } from "@/context/HistoryContext";
+import { useNotifications } from "@/context/NotificationsContext";
 import { useColors } from "@/hooks/useColors";
 
 export interface PostData {
@@ -47,12 +49,37 @@ export function PostCard({ post, onPress }: PostCardProps) {
   const colors = useColors();
   const { isBookmarked, toggleBookmark } = useBookmarks();
   const { hasRead } = useHistory();
+  const { optedIn, mutedSlugs, mutePost } = useNotifications();
   const bookmarked = isBookmarked(post.slug, post.locale);
   const read = hasRead(post.slug, post.locale);
+  const muted = mutedSlugs.includes(post.slug);
+
+  const handleLongPress = () => {
+    if (!optedIn) return;
+    if (muted) return;
+    const label = post.locale === "zh-cn"
+      ? "不再推送此文章"
+      : "Don't notify me about this";
+    const cancel = post.locale === "zh-cn" ? "取消" : "Cancel";
+    Alert.alert(
+      post.title,
+      undefined,
+      [
+        {
+          text: label,
+          style: "destructive",
+          onPress: () => mutePost(post.slug),
+        },
+        { text: cancel, style: "cancel" },
+      ]
+    );
+  };
 
   return (
     <Pressable
       onPress={onPress}
+      onLongPress={optedIn && !muted ? handleLongPress : undefined}
+      delayLongPress={400}
       style={({ pressed }) => [
         styles.container,
         {
@@ -127,6 +154,13 @@ export function PostCard({ post, onPress }: PostCardProps) {
               <View style={[styles.stalePill, { backgroundColor: colors.muted }]}>
                 <Text style={[styles.staleText, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}>
                   {post.locale === "zh-cn" ? "已缓存" : "Cached"}
+                </Text>
+              </View>
+            )}
+            {muted && (
+              <View style={[styles.stalePill, { backgroundColor: colors.muted }]}>
+                <Text style={[styles.staleText, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}>
+                  {post.locale === "zh-cn" ? "已静音" : "Muted"}
                 </Text>
               </View>
             )}
