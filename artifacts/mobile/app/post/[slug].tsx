@@ -35,6 +35,7 @@ import {
   type ColorTheme,
   LINE_SPACING_PRESETS,
 } from "@/hooks/useReadingPrefs";
+import { useCopyToast } from "@/hooks/useCopyToast";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const SCROLL_KEY_PREFIX = "@aklman/scroll/";
@@ -950,9 +951,7 @@ export default function PostDetailScreen() {
   const [resumeBannerPos, setResumeBannerPos] = useState<number | null>(null);
   const [selectedQuote, setSelectedQuote] = useState("");
   const [bannerVisible, setBannerVisible] = useState(false);
-  const [copyToastVisible, setCopyToastVisible] = useState(false);
-  const copyToastAnim = useRef(new Animated.Value(0)).current;
-  const copyToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { showCopyToast, copyToastVisible, copyToastAnim } = useCopyToast();
   const { isBookmarked, toggleBookmark } = useBookmarks();
   const { recordVisit } = useHistory();
 
@@ -1011,25 +1010,6 @@ export default function PostDetailScreen() {
   );
 
   const post = data as PostWithContent | undefined;
-
-  const showCopyToast = useCallback(() => {
-    if (copyToastTimerRef.current) clearTimeout(copyToastTimerRef.current);
-    copyToastAnim.stopAnimation();
-    copyToastAnim.setValue(1);
-    setCopyToastVisible(true);
-    copyToastTimerRef.current = setTimeout(() => {
-      Animated.timing(copyToastAnim, { toValue: 0, duration: 220, useNativeDriver: true }).start(({ finished }) => {
-        if (finished) setCopyToastVisible(false);
-      });
-    }, 2000);
-  }, [copyToastAnim]);
-
-  useEffect(() => {
-    return () => {
-      if (copyToastTimerRef.current) clearTimeout(copyToastTimerRef.current);
-      copyToastAnim.stopAnimation();
-    };
-  }, [copyToastAnim]);
 
   const handleShareQuote = useCallback(async () => {
     if (!post || !selectedQuote) return;
