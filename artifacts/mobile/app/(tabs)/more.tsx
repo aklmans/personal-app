@@ -7,10 +7,12 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  StyleProp,
   StyleSheet,
   Switch,
   Text,
   TextInput,
+  TextStyle,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -80,7 +82,7 @@ function HighlightedTitle({
 }: {
   text: string;
   query: string;
-  style: object[];
+  style: StyleProp<TextStyle>;
   highlightColor: string;
   numberOfLines?: number;
 }) {
