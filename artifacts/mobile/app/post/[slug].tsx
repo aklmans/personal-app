@@ -1200,7 +1200,9 @@ export default function PostDetailScreen() {
       if (result.action === Share.sharedAction) {
         showCopyToast(isZh ? "已分享" : "Shared!");
         webViewRef.current?.injectJavaScript(injectQuoteHighlight);
-      } else if (result.action === Share.dismissedAction) {
+      } else {
+        // dismissedAction on iPhone; on iPad the popover may resolve without
+        // dismissedAction, so treat any non-share result as a dismissal.
         showCopyToast(isZh ? "选段已保存" : "Selection saved");
         webViewRef.current?.injectJavaScript(injectQuoteHighlight);
       }
