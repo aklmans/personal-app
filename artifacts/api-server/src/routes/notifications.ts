@@ -19,9 +19,9 @@ const POLL_INTERVAL_MS = 10 * 60 * 1000;
 
 const TOKENS_FILE = join(process.cwd(), "data", "push-tokens.json");
 
-type TokenRecord = { token: string; locale: string };
+type TokenRecord = { token: string; locale: string; categories: string[] };
 
-const registeredTokens = new Map<string, string>();
+const registeredTokens = new Map<string, { locale: string; categories: string[] }>();
 
 const knownPostSlugs = new Set<string>();
 let initialized = false;
@@ -39,10 +39,13 @@ async function loadTokensFromDisk(): Promise<void> {
     if (Array.isArray(parsed)) {
       for (const item of parsed) {
         if (typeof item === "string") {
-          registeredTokens.set(item, "en");
+          registeredTokens.set(item, { locale: "en", categories: [] });
         } else if (item && typeof item === "object" && typeof (item as TokenRecord).token === "string") {
           const r = item as TokenRecord;
-          registeredTokens.set(r.token, r.locale ?? "en");
+          registeredTokens.set(r.token, {
+            locale: r.locale ?? "en",
+            categories: Array.isArray(r.categories) ? r.categories : [],
+          });
         }
       }
       logger.info({ count: registeredTokens.size }, "Loaded push tokens from disk");
@@ -56,7 +59,7 @@ async function saveTokensToDisk(): Promise<void> {
   try {
     await mkdir(join(process.cwd(), "data"), { recursive: true });
     const records: TokenRecord[] = Array.from(registeredTokens.entries()).map(
-      ([token, locale]) => ({ token, locale })
+      ([token, { locale, categories }]) => ({ token, locale, categories })
     );
     await writeFile(TOKENS_FILE, JSON.stringify(records), "utf-8");
   } catch (err) {
@@ -128,7 +131,7 @@ async function fetchSitemapPostSlugs(locale: string): Promise<{ slug: string; lo
   return localeUrls.map((url) => ({ slug: extractSlugFromUrl(url), locale }));
 }
 
-async function fetchRssPostSlugs(locale: string): Promise<{ slug: string; title: string; locale: string }[]> {
+async function fetchRssPostSlugs(locale: string): Promise<{ slug: string; title: string; locale: string; categories: string[] }[]> {
   const feedUrl = RSS_FEEDS[locale];
   if (!feedUrl) return [];
   try {
@@ -140,15 +143,17 @@ async function fetchRssPostSlugs(locale: string): Promise<{ slug: string; title:
     const xml = await res.text();
 
     const itemMatches = xml.matchAll(/<item>([\s\S]*?)<\/item>/gi);
-    const items: { slug: string; title: string; locale: string }[] = [];
+    const items: { slug: string; title: string; locale: string; categories: string[] }[] = [];
     for (const match of itemMatches) {
       const block = match[1] ?? "";
       const titleM = block.match(/<title>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/i);
       const linkM = block.match(/<link>([\s\S]*?)<\/link>/i);
       const title = (titleM?.[1] ?? "").trim();
       const link = (linkM?.[1] ?? "").trim();
+      const catMatches = [...block.matchAll(/<category>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/category>/gi)];
+      const categories = catMatches.map((m) => (m[1] ?? "").trim()).filter(Boolean);
       if (link) {
-        items.push({ slug: extractSlugFromUrl(link), title, locale });
+        items.push({ slug: extractSlugFromUrl(link), title, locale, categories });
       }
     }
     return items;
@@ -208,19 +213,19 @@ async function sendExpoPushNotifications(messages: object[]): Promise<void> {
 async function pollAndNotify(): Promise<void> {
   if (registeredTokens.size === 0 && initialized) return;
 
-  const newPosts: { slug: string; title: string; locale: string }[] = [];
+  const newPosts: { slug: string; title: string; locale: string; categories: string[] }[] = [];
 
   for (const locale of Object.keys(RSS_FEEDS)) {
     const rssItems = await fetchRssPostSlugs(locale);
     const sitemapItems = await fetchSitemapPostSlugs(locale);
 
-    const allSlugs = new Map<string, { slug: string; title: string; locale: string }>();
+    const allSlugs = new Map<string, { slug: string; title: string; locale: string; categories: string[] }>();
     for (const item of rssItems) {
-      allSlugs.set(item.slug, { slug: item.slug, title: item.title, locale });
+      allSlugs.set(item.slug, { slug: item.slug, title: item.title, locale, categories: item.categories });
     }
     for (const item of sitemapItems) {
       if (!allSlugs.has(item.slug)) {
-        allSlugs.set(item.slug, { slug: item.slug, title: "", locale });
+        allSlugs.set(item.slug, { slug: item.slug, title: "", locale, categories: [] });
       }
     }
 
@@ -247,7 +252,12 @@ async function pollAndNotify(): Promise<void> {
 
   for (const post of newPosts) {
     const matchingTokens = Array.from(registeredTokens.entries())
-      .filter(([, locale]) => locale === post.locale)
+      .filter(([, rec]) => {
+        if (rec.locale !== post.locale) return false;
+        if (rec.categories.length === 0) return true;
+        if (post.categories.length === 0) return true;
+        return post.categories.some((c) => rec.categories.includes(c));
+      })
       .map(([token]) => token);
 
     if (matchingTokens.length === 0) continue;
@@ -284,15 +294,18 @@ function isValidExpoToken(token: string): boolean {
 const VALID_LOCALES = new Set(Object.keys(RSS_FEEDS));
 
 router.post("/register", async (req, res) => {
-  const { token, locale } = req.body as { token?: string; locale?: string };
+  const { token, locale, categories } = req.body as { token?: string; locale?: string; categories?: unknown };
   if (!token || typeof token !== "string" || !isValidExpoToken(token)) {
     res.status(400).json({ error: "valid Expo push token is required" });
     return;
   }
   const resolvedLocale = locale && VALID_LOCALES.has(locale) ? locale : "en";
-  registeredTokens.set(token, resolvedLocale);
+  const resolvedCategories: string[] = Array.isArray(categories)
+    ? (categories as unknown[]).filter((c): c is string => typeof c === "string")
+    : [];
+  registeredTokens.set(token, { locale: resolvedLocale, categories: resolvedCategories });
   await saveTokensToDisk();
-  logger.info({ tokenCount: registeredTokens.size, locale: resolvedLocale }, "Push token registered");
+  logger.info({ tokenCount: registeredTokens.size, locale: resolvedLocale, categoryCount: resolvedCategories.length }, "Push token registered");
   res.json({ ok: true });
 });
 

@@ -77,7 +77,7 @@ export default function MoreScreen() {
   const router = useRouter();
   const { bookmarks, toggleBookmark } = useBookmarks();
   const { history, clearHistory } = useHistory();
-  const { optedIn, permissionStatus, isLoading, enable, disable } = useNotifications();
+  const { optedIn, permissionStatus, isLoading, enable, disable, notifCategories, setNotifCategories } = useNotifications();
   const topPad = Platform.OS === "web" ? Math.max(insets.top, 67) : insets.top;
 
   const [bookmarkSort, setBookmarkSort] = useState<SortOrder>("newest");
@@ -109,6 +109,22 @@ export default function MoreScreen() {
       setActiveCategory(null);
     }
   }, [bookmarkCategories, activeCategory]);
+
+  const allKnownCategories = useMemo(() => {
+    const seen = new Set<string>();
+    const cats: string[] = [];
+    for (const entry of history) {
+      for (const c of entry.categories ?? []) {
+        if (!seen.has(c)) { seen.add(c); cats.push(c); }
+      }
+    }
+    for (const b of bookmarks) {
+      for (const c of b.categories) {
+        if (!seen.has(c)) { seen.add(c); cats.push(c); }
+      }
+    }
+    return cats;
+  }, [history, bookmarks]);
 
   const readingStats = useMemo(() => {
     const totalArticles = history.length;
@@ -675,6 +691,77 @@ export default function MoreScreen() {
           </View>
         )}
 
+        {optedIn && Platform.OS !== "web" && allKnownCategories.length > 0 && (
+          <View
+            style={[
+              styles.notifTopicsBlock,
+              { backgroundColor: colors.card, borderColor: colors.border },
+            ]}
+          >
+            <View style={styles.notifTopicsHeader}>
+              <Text
+                style={[
+                  styles.sectionLabel,
+                  { color: colors.mutedForeground, fontFamily: fonts.sans.semiBold, marginBottom: 0, marginTop: 0 },
+                ]}
+              >
+                {isZh ? "通知主题" : "NOTIFY FOR TOPICS"}
+              </Text>
+              <Text
+                style={[
+                  styles.notifTopicsHint,
+                  { color: colors.mutedForeground, fontFamily: fonts.sans.regular },
+                ]}
+              >
+                {isZh ? "空选 = 全部" : "Empty = all"}
+              </Text>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.chipScroll}
+              contentContainerStyle={styles.chipRow}
+            >
+              {allKnownCategories.map((cat) => {
+                const isSelected = notifCategories.includes(cat);
+                return (
+                  <Pressable
+                    key={cat}
+                    onPress={() => {
+                      const next = isSelected
+                        ? notifCategories.filter((c) => c !== cat)
+                        : [...notifCategories, cat];
+                      void setNotifCategories(next);
+                    }}
+                    style={[
+                      styles.chip,
+                      {
+                        backgroundColor: isSelected ? colors.primary : colors.secondary,
+                        borderColor: isSelected ? colors.primary : colors.border,
+                      },
+                    ]}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: isSelected }}
+                    accessibilityLabel={cat}
+                  >
+                    <Text
+                      style={[
+                        styles.chipLabel,
+                        {
+                          color: isSelected ? "#ffffff" : colors.mutedForeground,
+                          fontFamily: fonts.sans.medium,
+                        },
+                      ]}
+                    >
+                      {cat}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
+
         <View
           style={[
             styles.themeBlock,
@@ -886,6 +973,23 @@ const styles = StyleSheet.create({
   notifHint: {
     fontSize: 11,
     marginTop: 2,
+  },
+  notifTopicsBlock: {
+    borderRadius: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginBottom: 4,
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 10,
+  },
+  notifTopicsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  notifTopicsHint: {
+    fontSize: 11,
   },
   bookmarkRow: {
     flexDirection: "row",
