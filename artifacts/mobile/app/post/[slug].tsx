@@ -1074,11 +1074,14 @@ export default function PostDetailScreen() {
       return;
     }
     try {
-      await Share.share(
+      const result = await Share.share(
         Platform.OS === "ios"
           ? { message, url: post.link }
           : { message }
       );
+      if (result.action === Share.sharedAction) {
+        showCopyToast(isZh ? "已分享" : "Shared!");
+      }
     } catch {
       try {
         await Clipboard.setStringAsync(message);
