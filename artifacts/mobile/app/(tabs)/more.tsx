@@ -9,6 +9,7 @@ import {
   StyleSheet,
   Switch,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -82,6 +83,7 @@ export default function MoreScreen() {
 
   const [bookmarkSort, setBookmarkSort] = useState<SortOrder>("newest");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const bookmarkCategories = useMemo(() => {
     const seen = new Set<string>();
@@ -98,11 +100,15 @@ export default function MoreScreen() {
   }, [bookmarks]);
 
   const displayedBookmarks = useMemo(() => {
-    const filtered = activeCategory
+    let filtered = activeCategory
       ? bookmarks.filter((b) => b.categories.includes(activeCategory))
       : bookmarks;
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      filtered = filtered.filter((b) => b.title.toLowerCase().includes(q));
+    }
     return bookmarkSort === "newest" ? filtered : [...filtered].reverse();
-  }, [bookmarks, activeCategory, bookmarkSort]);
+  }, [bookmarks, activeCategory, bookmarkSort, searchQuery]);
 
   React.useEffect(() => {
     if (activeCategory !== null && !bookmarkCategories.includes(activeCategory)) {
@@ -113,6 +119,7 @@ export default function MoreScreen() {
   useFocusEffect(
     useCallback(() => {
       refreshAvailableCategories();
+      return () => { setSearchQuery(""); };
     }, [refreshAvailableCategories])
   );
 
@@ -353,6 +360,28 @@ export default function MoreScreen() {
           </ScrollView>
         )}
 
+        {bookmarks.length > 0 && (
+          <View style={[styles.searchRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Feather name="search" size={15} color={colors.mutedForeground} style={styles.searchIcon} />
+            <TextInput
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder={isZh ? "搜索书签…" : "Search bookmarks…"}
+              placeholderTextColor={colors.mutedForeground}
+              style={[styles.searchInput, { color: colors.text, fontFamily: fonts.sans.regular }]}
+              returnKeyType="search"
+              clearButtonMode="while-editing"
+              autoCorrect={false}
+              autoCapitalize="none"
+            />
+            {searchQuery.length > 0 && Platform.OS !== "ios" && (
+              <Pressable onPress={() => setSearchQuery("")} hitSlop={8}>
+                <Feather name="x" size={15} color={colors.mutedForeground} />
+              </Pressable>
+            )}
+          </View>
+        )}
+
         {bookmarks.length === 0 ? (
           <View style={[styles.emptyBookmarks, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Feather name="bookmark" size={22} color={colors.mutedForeground} />
@@ -362,9 +391,11 @@ export default function MoreScreen() {
           </View>
         ) : displayedBookmarks.length === 0 ? (
           <View style={[styles.emptyBookmarks, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Feather name="filter" size={22} color={colors.mutedForeground} />
+            <Feather name={searchQuery.trim() ? "search" : "filter"} size={22} color={colors.mutedForeground} />
             <Text style={[styles.emptyBookmarksText, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}>
-              {isZh ? "此分类下暂无书签。" : "No bookmarks in this category."}
+              {searchQuery.trim()
+                ? (isZh ? "没有符合的书签。" : "No bookmarks match your search.")
+                : (isZh ? "此分类下暂无书签。" : "No bookmarks in this category.")}
             </Text>
           </View>
         ) : (
@@ -996,6 +1027,23 @@ const styles = StyleSheet.create({
   },
   notifTopicsHint: {
     fontSize: 11,
+  },
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginBottom: 6,
+    paddingHorizontal: 10,
+    paddingVertical: Platform.OS === "ios" ? 8 : 4,
+  },
+  searchIcon: {
+    marginRight: 7,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    paddingVertical: 0,
   },
   bookmarkRow: {
     flexDirection: "row",
