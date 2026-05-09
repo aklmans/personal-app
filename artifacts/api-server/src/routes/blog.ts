@@ -838,6 +838,9 @@ async function revalidateStaleContent(): Promise<void> {
 
   logger.info({ count: staleUrls.length }, "blog: revalidating stale content cache entries");
 
+  let changed = 0;
+  let unchanged = 0;
+
   const tasks = staleUrls.map((url) => async () => {
     try {
       const res = await fetch(url, {
@@ -847,16 +850,25 @@ async function revalidateStaleContent(): Promise<void> {
       if (!res.ok) return;
       const html = await res.text();
       const extracted = extractArticleHtml(html);
+      const previous = contentCache.get(url)?.html ?? "";
       const ts = Date.now();
       contentCache.set(url, { html: extracted, ts });
       saveContentToDisk(url, extracted, ts);
+      if (extracted !== previous) {
+        changed++;
+      } else {
+        unchanged++;
+      }
     } catch {
       // fire-and-forget; failures are silent to keep log noise low
     }
   });
 
   await withConcurrencyLimit(tasks, SCRAPE_CONCURRENCY);
-  logger.info({ count: staleUrls.length }, "blog: content revalidation complete");
+  logger.info(
+    { revalidated: staleUrls.length, changed, unchanged },
+    "blog: content revalidation complete"
+  );
 }
 
 // Recurring revalidation interval handle — stored so it can be cleared on
