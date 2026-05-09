@@ -626,6 +626,7 @@ async function doFetchFeed(locale: string): Promise<BlogPost[]> {
   let sitemapScrapeCount = 0;
   let sitemapFromDisk = 0;
   let evicted = 0;
+  let contentEvicted = 0;
   try {
     const sitemapUrls = await fetchSitemapPostUrls(locale);
 
@@ -646,6 +647,21 @@ async function doFetchFeed(locale: string): Promise<BlogPost[]> {
     }
     if (evicted > 0) {
       flushMetadataDiskCache().catch(() => {});
+    }
+
+    // Evict content cache entries for this locale whose URL is no longer in the sitemap.
+    for (const url of contentCache.keys()) {
+      const isCurrentLocale =
+        locale === "zh-cn"
+          ? url.includes(`${SITE_BASE}/zh-cn/`)
+          : !url.includes(`${SITE_BASE}/zh-cn/`);
+      if (!isCurrentLocale) continue;
+      if (!sitemapNormalized.has(url.replace(/\/+$/, ""))) {
+        contentCache.delete(url);
+        contentDiskTs.delete(url);
+        fs.unlink(contentDiskCachePath(url), () => {});
+        contentEvicted++;
+      }
     }
 
     const newUrls = sitemapUrls.filter(
@@ -763,6 +779,7 @@ async function doFetchFeed(locale: string): Promise<BlogPost[]> {
       sitemapScrapeCount,
       sitemapFound: sitemapPosts.length,
       evicted,
+      contentEvicted,
       totalPosts: posts.length,
       durationMs: now - t0,
     },
