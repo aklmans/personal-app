@@ -94,7 +94,11 @@ function loadDiskCache(): void {
 function saveDiskCache(locale: string, entry: CacheEntry): void {
   try {
     fs.mkdirSync(DISK_CACHE_DIR, { recursive: true });
-    fs.writeFileSync(diskCachePath(locale), JSON.stringify(entry), "utf8");
+    const slim: CacheEntry = {
+      timestamp: entry.timestamp,
+      posts: entry.posts.map(({ content: _omit, ...rest }) => ({ ...rest, content: "" })),
+    };
+    fs.writeFileSync(diskCachePath(locale), JSON.stringify(slim), "utf8");
   } catch (err) {
     logger.warn({ locale, err }, "blog: failed to write disk cache");
   }
