@@ -71,6 +71,39 @@ const THEME_OPTIONS: { value: ThemePreference; label: string; labelZh: string; i
 
 type SortOrder = "newest" | "oldest";
 
+function HighlightedTitle({
+  text,
+  query,
+  style,
+  highlightColor,
+  numberOfLines,
+}: {
+  text: string;
+  query: string;
+  style: object[];
+  highlightColor: string;
+  numberOfLines?: number;
+}) {
+  const q = query.trim().toLowerCase();
+  if (!q) {
+    return <Text style={style} numberOfLines={numberOfLines}>{text}</Text>;
+  }
+  const idx = text.toLowerCase().indexOf(q);
+  if (idx === -1) {
+    return <Text style={style} numberOfLines={numberOfLines}>{text}</Text>;
+  }
+  const before = text.slice(0, idx);
+  const match = text.slice(idx, idx + q.length);
+  const after = text.slice(idx + q.length);
+  return (
+    <Text style={style} numberOfLines={numberOfLines}>
+      {before}
+      <Text style={{ color: highlightColor }}>{match}</Text>
+      {after}
+    </Text>
+  );
+}
+
 export default function MoreScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -443,12 +476,13 @@ export default function MoreScreen() {
                 </View>
               )}
               <View style={styles.bookmarkContent}>
-                <Text
+                <HighlightedTitle
+                  text={post.title}
+                  query={searchQuery}
                   style={[styles.bookmarkTitle, { color: colors.text, fontFamily: fonts.serif.semiBold }]}
+                  highlightColor={colors.primary}
                   numberOfLines={2}
-                >
-                  {post.title}
-                </Text>
+                />
                 {post.categories.length > 0 && (
                   <Text style={[styles.bookmarkMeta, { color: colors.primary, fontFamily: fonts.sans.regular }]}>
                     {post.categories[0]}
