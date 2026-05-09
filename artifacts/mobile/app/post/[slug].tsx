@@ -1117,7 +1117,7 @@ export default function PostDetailScreen() {
               onIncrease={increase}
               canDecrease={canDecrease}
               canIncrease={canIncrease}
-              primaryColor={colors.primary}
+              primaryColor={colorTheme === "default" ? colors.primary : themeColors.text}
               mutedColor={themeIconMuted}
             />
             {post && (
