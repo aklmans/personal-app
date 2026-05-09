@@ -418,14 +418,19 @@ async function loadMetadataDiskCache(): Promise<void> {
   }
 }
 
-function getMetadataFromDiskCache(url: string): BlogPost | null {
+function getMetadataFromDiskCache(
+  url: string,
+  opts?: { allowExpired?: boolean }
+): BlogPost | null {
   const key = url.replace(/\/+$/, "");
   const entry = _diskMetaCache.get(key) ?? _diskMetaCache.get(key + "/");
   if (!entry) return null;
   if (Date.now() - entry.savedAt > METADATA_DISK_TTL) {
-    _diskMetaCache.delete(key);
-    _diskMetaCache.delete(key + "/");
-    return null;
+    if (!opts?.allowExpired) {
+      _diskMetaCache.delete(key);
+      _diskMetaCache.delete(key + "/");
+      return null;
+    }
   }
   return entry.post;
 }
@@ -571,6 +576,23 @@ async function doFetchFeed(locale: string): Promise<BlogPost[]> {
     }
   } catch (err) {
     logger.warn({ locale, err }, "blog: sitemap scraping failed");
+    const rssLinks = new Set(rssPosts.map((p) => p.link.replace(/\/+$/, "")));
+    const staleFallback: BlogPost[] = [];
+    for (const [_url, entry] of _diskMetaCache.entries()) {
+      if (
+        entry.post.locale === locale &&
+        !rssLinks.has(entry.post.link.replace(/\/+$/, ""))
+      ) {
+        staleFallback.push(entry.post);
+      }
+    }
+    if (staleFallback.length > 0) {
+      logger.warn(
+        { locale, sitemapStale: staleFallback.length },
+        "blog: serving stale metadata disk cache as fallback"
+      );
+      sitemapPosts = staleFallback;
+    }
   }
 
   const allPosts = [...rssPosts, ...sitemapPosts].sort((a, b) => {
