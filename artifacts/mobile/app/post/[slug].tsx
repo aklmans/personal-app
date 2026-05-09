@@ -934,6 +934,7 @@ function buildHtml(
 }
 
 const QUOTE_MAX_LENGTH = 300;
+const QUOTE_MIN_AUTO_COPY_LENGTH = 20;
 
 export default function PostDetailScreen() {
   const colors = useColors();
@@ -1269,7 +1270,7 @@ export default function PostDetailScreen() {
         const msg = JSON.parse(event.data as string);
         if (msg.t === "selection" && typeof msg.text === "string") {
           setSelectedQuote(msg.text);
-          if (msg.text && msg.text.length <= QUOTE_MAX_LENGTH && post) {
+          if (msg.text && msg.text.length >= QUOTE_MIN_AUTO_COPY_LENGTH && msg.text.length <= QUOTE_MAX_LENGTH && post) {
             const message = `"${msg.text}"\n\n— ${post.title}\n${post.link}`;
             navigator.clipboard.writeText(message).then(() => {
               showCopyToast(isZh ? "引用已复制" : "Quote copied");
