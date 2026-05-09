@@ -1079,6 +1079,9 @@ export default function PostDetailScreen() {
           ? { message, url: post.link }
           : { message }
       );
+      // sharedAction fires for both visible sheet shares and silent
+      // direct-share targets — no API exists to distinguish them,
+      // so we show feedback in both cases.
       if (result.action === Share.sharedAction) {
         showCopyToast(isZh ? "已分享" : "Shared!");
       }
