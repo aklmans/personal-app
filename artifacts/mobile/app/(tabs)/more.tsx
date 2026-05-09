@@ -548,7 +548,7 @@ export default function MoreScreen() {
                 {isZh ? "预计分钟" : "Est. Minutes"}
               </Text>
             </View>
-            <View style={styles.statItem}>
+            <View style={[styles.statItem, { borderRightWidth: 0 }]}>
               <View style={[styles.statIconWrap, { backgroundColor: colors.secondary }]}>
                 <Feather name="tag" size={18} color={colors.primary} />
               </View>
