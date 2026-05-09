@@ -1097,6 +1097,7 @@ export default function PostDetailScreen() {
         showCopyToast(isZh ? "已分享" : "Shared!");
         webViewRef.current?.injectJavaScript(injectQuoteHighlight);
       } else if (result.action === Share.dismissedAction) {
+        showCopyToast(isZh ? "选段已保存" : "Selection saved");
         webViewRef.current?.injectJavaScript(injectQuoteHighlight);
       }
     } catch {
