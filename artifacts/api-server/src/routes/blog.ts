@@ -542,9 +542,14 @@ async function doFetchFeed(locale: string): Promise<BlogPost[]> {
       const fromDisk: BlogPost[] = [];
       const toFetch: string[] = [];
       for (const u of newUrls) {
-        const cached = getMetadataFromDiskCache(u);
-        if (cached) {
-          fromDisk.push(cached);
+        // Use an inline freshness check instead of getMetadataFromDiskCache so
+        // that expired entries are NOT evicted here — they must survive in
+        // _diskMetaCache to be available as stale fallback if all live fetches fail.
+        const key = u.replace(/\/+$/, "");
+        const diskEntry = _diskMetaCache.get(key) ?? _diskMetaCache.get(key + "/");
+        const isFresh = diskEntry != null && Date.now() - diskEntry.savedAt <= METADATA_DISK_TTL;
+        if (isFresh) {
+          fromDisk.push(diskEntry!.post);
         } else {
           toFetch.push(u);
         }
@@ -570,33 +575,49 @@ async function doFetchFeed(locale: string): Promise<BlogPost[]> {
           _diskMetaCache.set(post.link.replace(/\/+$/, ""), { post, savedAt });
         }
         flushMetadataDiskCache().catch(() => {});
+
+        // toFetch failure branch: all live scrapes failed and no fresh disk hits
+        // either — serve stale disk metadata (including expired entries) so readers
+        // see posts rather than a blank screen during an extended site outage.
+        if (freshPosts.length === 0 && fromDisk.length === 0) {
+          const rssLinks = new Set(rssPosts.map((p) => p.link.replace(/\/+$/, "")));
+          const seen = new Set<string>();
+          const staleFallback: BlogPost[] = [];
+          for (const [url] of _diskMetaCache.entries()) {
+            const post = getMetadataFromDiskCache(url, { allowExpired: true });
+            if (post && post.locale === locale) {
+              const normalized = post.link.replace(/\/+$/, "");
+              if (!rssLinks.has(normalized) && !seen.has(normalized)) {
+                seen.add(normalized);
+                staleFallback.push(post);
+              }
+            }
+          }
+          if (staleFallback.length > 0) {
+            logger.warn(
+              { locale, sitemapStale: staleFallback.length },
+              "blog: serving stale metadata disk cache as fallback"
+            );
+            sitemapPosts = staleFallback;
+          }
+        }
       }
 
-      sitemapPosts = [...fromDisk, ...freshPosts];
+      if (sitemapPosts.length === 0) {
+        sitemapPosts = [...fromDisk, ...freshPosts];
+      }
     }
   } catch (err) {
     logger.warn({ locale, err }, "blog: sitemap scraping failed");
-  }
-
-  const allPosts = [...rssPosts, ...sitemapPosts].sort((a, b) => {
-    const da = a.pubDate ? new Date(a.pubDate).getTime() : 0;
-    const db = b.pubDate ? new Date(b.pubDate).getTime() : 0;
-    return db - da;
-  });
-
-  // Last-resort fallback: if no live data arrived from either source, serve any
-  // metadata entries still held in _diskMetaCache for this locale — including
-  // entries whose savedAt has passed METADATA_DISK_TTL — so readers see stale
-  // posts rather than a blank list during extended feed outages.
-  let effectivePosts = allPosts;
-  if (allPosts.length === 0) {
-    const staleFallback: BlogPost[] = [];
+    // fetchSitemapPostUrls threw (rare but possible); serve stale disk metadata.
+    const rssLinks = new Set(rssPosts.map((p) => p.link.replace(/\/+$/, "")));
     const seen = new Set<string>();
+    const staleFallback: BlogPost[] = [];
     for (const [url] of _diskMetaCache.entries()) {
       const post = getMetadataFromDiskCache(url, { allowExpired: true });
       if (post && post.locale === locale) {
         const normalized = post.link.replace(/\/+$/, "");
-        if (!seen.has(normalized)) {
+        if (!rssLinks.has(normalized) && !seen.has(normalized)) {
           seen.add(normalized);
           staleFallback.push(post);
         }
@@ -607,12 +628,18 @@ async function doFetchFeed(locale: string): Promise<BlogPost[]> {
         { locale, sitemapStale: staleFallback.length },
         "blog: serving stale metadata disk cache as fallback"
       );
-      effectivePosts = staleFallback;
+      sitemapPosts = staleFallback;
     }
   }
 
+  const allPosts = [...rssPosts, ...sitemapPosts].sort((a, b) => {
+    const da = a.pubDate ? new Date(a.pubDate).getTime() : 0;
+    const db = b.pubDate ? new Date(b.pubDate).getTime() : 0;
+    return db - da;
+  });
+
   const now = Date.now();
-  const posts = effectivePosts.length > 0 ? effectivePosts : (cache[locale]?.posts ?? []);
+  const posts = allPosts.length > 0 ? allPosts : (cache[locale]?.posts ?? []);
   const entry: CacheEntry = { posts, timestamp: now };
   cache[locale] = entry;
   saveDiskCache(locale, entry);
