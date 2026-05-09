@@ -98,16 +98,17 @@ export default function MoreScreen() {
   }, [bookmarks]);
 
   const displayedBookmarks = useMemo(() => {
-    const indexed = bookmarks.map((b, i) => ({ b, i }));
     const filtered = activeCategory
-      ? indexed.filter(({ b }) => b.categories.includes(activeCategory))
-      : indexed;
-    const sorted =
-      bookmarkSort === "newest"
-        ? filtered
-        : [...filtered].reverse();
-    return sorted.map(({ b }) => b);
+      ? bookmarks.filter((b) => b.categories.includes(activeCategory))
+      : bookmarks;
+    return bookmarkSort === "newest" ? filtered : [...filtered].reverse();
   }, [bookmarks, activeCategory, bookmarkSort]);
+
+  React.useEffect(() => {
+    if (activeCategory !== null && !bookmarkCategories.includes(activeCategory)) {
+      setActiveCategory(null);
+    }
+  }, [bookmarkCategories, activeCategory]);
 
   const openUrl = useCallback(async (url: string) => {
     await WebBrowser.openBrowserAsync(url);
