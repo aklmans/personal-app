@@ -88,6 +88,7 @@ export default function MoreScreen() {
   const [bookmarkSort, setBookmarkSort] = useState<SortOrder>("newest");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [historyQuery, setHistoryQuery] = useState("");
 
   useEffect(() => {
     AsyncStorage.getItem("@bookmark_sort_v1")
@@ -137,9 +138,17 @@ export default function MoreScreen() {
     useCallback(() => {
       refreshAvailableCategories();
       clearBadge();
-      return () => { setSearchQuery(""); };
+      return () => { setSearchQuery(""); setHistoryQuery(""); };
     }, [refreshAvailableCategories, clearBadge])
   );
+
+  const displayedHistory = useMemo(() => {
+    const q = historyQuery.trim().toLowerCase();
+    const filtered = q
+      ? history.filter((e) => e.title.toLowerCase().includes(q))
+      : history.slice(0, 10);
+    return filtered;
+  }, [history, historyQuery]);
 
   const allKnownCategories = useMemo(() => {
     const seen = new Set<string>(availableCategories);
@@ -560,6 +569,28 @@ export default function MoreScreen() {
             </Pressable>
           )}
         </View>
+        {history.length > 0 && (
+          <View style={[styles.searchRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Feather name="search" size={15} color={colors.mutedForeground} style={styles.searchIcon} />
+            <TextInput
+              value={historyQuery}
+              onChangeText={setHistoryQuery}
+              placeholder={isZh ? "搜索历史记录…" : "Search history…"}
+              placeholderTextColor={colors.mutedForeground}
+              style={[styles.searchInput, { color: colors.text, fontFamily: fonts.sans.regular }]}
+              returnKeyType="search"
+              clearButtonMode="while-editing"
+              autoCorrect={false}
+              autoCapitalize="none"
+            />
+            {historyQuery.length > 0 && Platform.OS !== "ios" && (
+              <Pressable onPress={() => setHistoryQuery("")} hitSlop={8}>
+                <Feather name="x" size={15} color={colors.mutedForeground} />
+              </Pressable>
+            )}
+          </View>
+        )}
+
         {history.length === 0 ? (
           <View style={[styles.emptyBookmarks, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Feather name="clock" size={22} color={colors.mutedForeground} />
@@ -567,8 +598,15 @@ export default function MoreScreen() {
               {isZh ? "尚无阅读记录。打开文章后将自动记录在这里。" : "No reading history yet. Articles you open will appear here."}
             </Text>
           </View>
+        ) : displayedHistory.length === 0 ? (
+          <View style={[styles.emptyBookmarks, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Feather name="search" size={22} color={colors.mutedForeground} />
+            <Text style={[styles.emptyBookmarksText, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}>
+              {isZh ? "没有符合的阅读记录。" : "No history matches your search."}
+            </Text>
+          </View>
         ) : (
-          history.slice(0, 10).map((entry: HistoryEntry) => (
+          displayedHistory.map((entry: HistoryEntry) => (
             <Pressable
               key={`${entry.locale}:${entry.slug}`}
               onPress={() =>
@@ -599,7 +637,7 @@ export default function MoreScreen() {
               <View style={styles.bookmarkContent}>
                 <HighlightedTitle
                   text={entry.title}
-                  query={searchQuery}
+                  query={historyQuery}
                   style={[styles.bookmarkTitle, { color: colors.text, fontFamily: fonts.serif.semiBold }]}
                   highlightColor={colors.primary}
                   numberOfLines={2}
