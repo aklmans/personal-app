@@ -1268,12 +1268,18 @@ export default function PostDetailScreen() {
         const msg = JSON.parse(event.data as string);
         if (msg.t === "selection" && typeof msg.text === "string") {
           setSelectedQuote(msg.text);
+          if (msg.text && msg.text.length <= QUOTE_MAX_LENGTH && post) {
+            const message = `"${msg.text}"\n\n— ${post.title}\n${post.link}`;
+            navigator.clipboard.writeText(message).then(() => {
+              showCopyToast(isZh ? "引用已复制" : "Quote copied");
+            }).catch(() => {});
+          }
         }
       } catch {}
     };
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, []);
+  }, [post, isZh, showCopyToast]);
 
   useEffect(() => {
     if (Platform.OS !== "web" && webViewRef.current) {
