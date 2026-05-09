@@ -1473,23 +1473,34 @@ export default function PostDetailScreen() {
   return (
     <View style={[styles.root, { backgroundColor: themeColors.bg }]}>
       {Platform.OS === "web" ? (
-        hydrated ? (
-          <iframe
-            ref={iframeRef}
-            srcDoc={webHtmlContent}
-            onLoad={onIframeLoad}
-            style={{
-              flex: 1,
-              border: "none",
-              width: "100%",
-              height: "100%",
-              backgroundColor: themeColors.bg,
-            } as React.CSSProperties}
-            title={post.title}
-          />
-        ) : (
-          <View style={{ flex: 1, backgroundColor: themeColors.bg }} />
-        )
+        <>
+          <View style={{ height: 3, backgroundColor: colors.border, overflow: "hidden" }}>
+            <Animated.View
+              style={{
+                height: "100%",
+                backgroundColor: colors.primary,
+                width: progressAnim.interpolate({ inputRange: [0, 1], outputRange: ["0%", "100%"] }),
+              }}
+            />
+          </View>
+          {hydrated ? (
+            <iframe
+              ref={iframeRef}
+              srcDoc={webHtmlContent}
+              onLoad={onIframeLoad}
+              style={{
+                flex: 1,
+                border: "none",
+                width: "100%",
+                height: "100%",
+                backgroundColor: themeColors.bg,
+              } as React.CSSProperties}
+              title={post.title}
+            />
+          ) : (
+            <View style={{ flex: 1, backgroundColor: themeColors.bg }} />
+          )}
+        </>
       ) : hydrated ? (
         <WebView
           ref={webViewRef}
