@@ -10,6 +10,7 @@ import {
 
 import { fonts } from "@/constants/fonts";
 import { useBookmarks } from "@/context/BookmarksContext";
+import { useHistory } from "@/context/HistoryContext";
 import { useColors } from "@/hooks/useColors";
 
 export interface PostData {
@@ -45,7 +46,9 @@ function formatDate(pubDate: string): string {
 export function PostCard({ post, onPress }: PostCardProps) {
   const colors = useColors();
   const { isBookmarked, toggleBookmark } = useBookmarks();
+  const { hasRead } = useHistory();
   const bookmarked = isBookmarked(post.slug, post.locale);
+  const read = hasRead(post.slug, post.locale);
 
   return (
     <Pressable
@@ -59,6 +62,11 @@ export function PostCard({ post, onPress }: PostCardProps) {
         },
       ]}
     >
+      {read && (
+        <View style={[styles.readBadge, { backgroundColor: colors.muted }]} pointerEvents="none">
+          <Feather name="check" size={10} color={colors.mutedForeground} />
+        </View>
+      )}
       {post.coverImage ? (
         <Image
           source={{ uri: post.coverImage }}
@@ -205,5 +213,16 @@ const styles = StyleSheet.create({
   staleText: {
     fontSize: 10,
     letterSpacing: 0.2,
+  },
+  readBadge: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    zIndex: 1,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
