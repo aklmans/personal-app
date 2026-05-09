@@ -41,6 +41,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const SCROLL_KEY_PREFIX = "@aklman/scroll/";
 const SCROLL_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000;
+const SWIPE_HINT_KEY = "@aklman/banner_swipe_hint_seen";
 
 async function saveScrollPos(key: string, position: number): Promise<void> {
   try {
@@ -977,9 +978,11 @@ export default function PostDetailScreen() {
   const isRestoringRef = useRef(false);
   const resumeBannerPosRef = useRef<number | null>(null);
   const dismissBannerRef = useRef<() => void>(() => {});
+  const markHintSeenRef = useRef<() => void>(() => {});
   const isDismissingBannerRef = useRef(false);
   const bannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bannerSwipeDy = useRef(new Animated.Value(0)).current;
+  const [showSwipeHint, setShowSwipeHint] = useState(false);
   const bannerPanResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gs) =>
@@ -989,6 +992,7 @@ export default function PostDetailScreen() {
       },
       onPanResponderRelease: (_, gs) => {
         if (gs.dy >= 60) {
+          markHintSeenRef.current();
           dismissBannerRef.current();
         } else {
           Animated.spring(bannerSwipeDy, {
@@ -1455,6 +1459,18 @@ export default function PostDetailScreen() {
 
   dismissBannerRef.current = dismissBanner;
 
+  const markHintSeen = useCallback(() => {
+    setShowSwipeHint(false);
+    AsyncStorage.setItem(SWIPE_HINT_KEY, "1").catch(() => {});
+  }, []);
+  markHintSeenRef.current = markHintSeen;
+
+  useEffect(() => {
+    AsyncStorage.getItem(SWIPE_HINT_KEY).then(val => {
+      if (val === null) setShowSwipeHint(true);
+    }).catch(() => {});
+  }, []);
+
   const handleResumeTap = useCallback(() => {
     if (resumeBannerPos === null) return;
     if (Platform.OS === "web") {
@@ -1781,26 +1797,31 @@ export default function PostDetailScreen() {
             },
           ]}
         >
-          <Pressable
-            onPress={handleResumeTap}
-            accessibilityRole="button"
-            accessibilityLabel={isZh ? "从上次阅读处继续" : "Resume from where you left off"}
-            style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", flex: 1, opacity: pressed ? 0.75 : 1 })}
-          >
-            <Feather name="bookmark" size={14} color={themeColors.text} style={{ marginRight: 6 }} />
-            <Text style={[styles.resumeBannerText, { fontFamily: fonts.sans.semiBold, color: themeColors.text }]}>
-              {isZh ? "从上次阅读处继续" : "Resume from where you left off"}
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={dismissBanner}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            accessibilityRole="button"
-            accessibilityLabel={isZh ? "关闭" : "Dismiss"}
-            style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, marginLeft: 8 })}
-          >
-            <Feather name="x" size={14} color={`${themeColors.text}CC`} />
-          </Pressable>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <Pressable
+              onPress={handleResumeTap}
+              accessibilityRole="button"
+              accessibilityLabel={isZh ? "从上次阅读处继续" : "Resume from where you left off"}
+              style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", flex: 1, opacity: pressed ? 0.75 : 1 })}
+            >
+              <Feather name="bookmark" size={14} color={themeColors.text} style={{ marginRight: 6 }} />
+              <Text style={[styles.resumeBannerText, { fontFamily: fonts.sans.semiBold, color: themeColors.text }]}>
+                {isZh ? "从上次阅读处继续" : "Resume from where you left off"}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={dismissBanner}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityRole="button"
+              accessibilityLabel={isZh ? "关闭" : "Dismiss"}
+              style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, marginLeft: 8 })}
+            >
+              <Feather name="x" size={14} color={`${themeColors.text}CC`} />
+            </Pressable>
+          </View>
+          {showSwipeHint && (
+            <View style={[styles.swipeHintHandle, { backgroundColor: `${themeColors.text}30` }]} />
+          )}
         </Animated.View>
       )}
 
@@ -1923,12 +1944,18 @@ const styles = StyleSheet.create({
   openBtnText: { color: "#ffffff", fontSize: 15 },
   errorText: { fontSize: 16, marginTop: 8 },
   resumeBanner: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: "column",
     borderRadius: 10,
     borderWidth: 1,
     paddingVertical: 11,
     paddingHorizontal: 14,
+  },
+  swipeHintHandle: {
+    alignSelf: "center",
+    marginTop: 6,
+    width: 28,
+    height: 3,
+    borderRadius: 2,
   },
   resumeBannerText: {
     flex: 1,
