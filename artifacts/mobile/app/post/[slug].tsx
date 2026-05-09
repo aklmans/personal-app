@@ -8,6 +8,7 @@ import {
   Animated,
   ActivityIndicator,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -971,6 +972,37 @@ export default function PostDetailScreen() {
   const dismissBannerRef = useRef<() => void>(() => {});
   const isDismissingBannerRef = useRef(false);
   const bannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const bannerSwipeDy = useRef(new Animated.Value(0)).current;
+  const bannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const bannerPanResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gs) =>
+        gs.dy > 5 && Math.abs(gs.dy) > Math.abs(gs.dx),
+      onPanResponderMove: (_, gs) => {
+        bannerSwipeDy.setValue(Math.max(0, gs.dy));
+      },
+      onPanResponderRelease: (_, gs) => {
+        if (gs.dy >= 60) {
+          dismissBannerRef.current();
+        } else {
+          Animated.spring(bannerSwipeDy, {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 80,
+            friction: 10,
+          }).start();
+        }
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(bannerSwipeDy, {
+          toValue: 0,
+          useNativeDriver: true,
+          tension: 80,
+          friction: 10,
+        }).start();
+      },
+    })
+  ).current;
 
   const { data, isLoading, isError } = useGetBlogPost(
     slug ?? "",
@@ -1347,6 +1379,7 @@ export default function PostDetailScreen() {
     resumeBannerPosRef.current = resumeBannerPos;
     if (resumeBannerPos !== null) {
       isDismissingBannerRef.current = false;
+      bannerSwipeDy.setValue(0);
       setBannerVisible(true);
       bannerAnim.setValue(0);
       Animated.spring(bannerAnim, {
@@ -1355,6 +1388,7 @@ export default function PostDetailScreen() {
         tension: 55,
         friction: 9,
       }).start();
+      if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
       bannerTimerRef.current = setTimeout(() => {
         dismissBannerRef.current();
       }, 5000);
@@ -1698,6 +1732,7 @@ export default function PostDetailScreen() {
 
       {bannerVisible && Platform.OS !== "web" && (
         <Animated.View
+          {...bannerPanResponder.panHandlers}
           style={[
             styles.resumeBanner,
             {
@@ -1706,10 +1741,13 @@ export default function PostDetailScreen() {
               marginBottom: 8,
               opacity: bannerAnim,
               transform: [{
-                translateY: bannerAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [60, 0],
-                }),
+                translateY: Animated.add(
+                  bannerAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [60, 0],
+                  }),
+                  bannerSwipeDy,
+                ),
               }],
             },
           ]}
