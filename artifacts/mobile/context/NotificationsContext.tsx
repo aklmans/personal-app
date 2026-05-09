@@ -147,10 +147,24 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   const notificationResponseListener = useRef<Notifications.EventSubscription | null>(null);
   const coldStartHandled = useRef(false);
   const pushTokenRef = useRef<string | null>(null);
+  const prevLocaleRef = useRef<string>(locale);
 
   useEffect(() => {
     fetchAvailableCategories();
   }, [fetchAvailableCategories]);
+
+  useEffect(() => {
+    const prevLocale = prevLocaleRef.current;
+    prevLocaleRef.current = locale;
+    if (prevLocale === locale) return;
+    if (!optedIn || Platform.OS === "web") return;
+    AsyncStorage.getItem(STORAGE_TOKEN_KEY)
+      .then(async (token) => {
+        if (!token) return;
+        await registerToken(token, locale, notifCategories);
+      })
+      .catch(() => {});
+  }, [locale, optedIn, notifCategories]);
 
   useEffect(() => {
     AsyncStorage.multiGet([STORAGE_KEY, STORAGE_CATEGORIES_KEY, STORAGE_TOKEN_KEY])
