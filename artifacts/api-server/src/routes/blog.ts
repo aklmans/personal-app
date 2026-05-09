@@ -61,16 +61,25 @@ function loadDiskCache(): void {
         const raw = fs.readFileSync(file, "utf8");
         const entry = JSON.parse(raw) as CacheEntry;
         if (entry && Array.isArray(entry.posts) && typeof entry.timestamp === "number" && Number.isFinite(entry.timestamp)) {
+          const now = Date.now();
+          const age = now - entry.timestamp;
+          // Skip disk cache entries older than FEED_DISK_TTL (24 h).
+          // Beyond that age the data is too stale to pre-warm; let the live
+          // fetch run on first request instead.
+          if (age > FEED_DISK_TTL) {
+            logger.info({ locale, ageMs: age }, "blog: disk cache too old, skipping pre-warm");
+            continue;
+          }
           // Clamp the loaded timestamp so it never appears older than STALE_TTL.
           // This guarantees the first request after restart is always served
           // immediately from disk (stale-while-revalidate), no matter how long
           // the server was offline.  A background refresh is triggered whenever
           // age > CACHE_TTL, which is preserved by using Math.max.
-          const now = Date.now();
           const minTimestamp = now - STALE_TTL + 1;
           const timestamp = Math.max(entry.timestamp, minTimestamp);
           cache[locale] = { posts: entry.posts, timestamp };
-          logger.info({ locale, posts: entry.posts.length }, "blog: loaded disk cache");
+          bootPrewarmedLocales.add(locale);
+          logger.info({ locale, posts: entry.posts.length, ageMs: age }, "blog: loaded disk cache");
         }
       } catch (err) {
         logger.warn({ locale, err }, "blog: failed to parse disk cache");
@@ -93,6 +102,13 @@ function saveDiskCache(locale: string, entry: CacheEntry): void {
 const cache: Record<string, CacheEntry> = {};
 const CACHE_TTL = 5 * 60 * 1000;
 const STALE_TTL = 30 * 60 * 1000;
+const FEED_DISK_TTL = 24 * 60 * 60 * 1000;
+
+// Tracks locales whose in-memory cache was seeded from disk on this boot.
+// Even if the disk snapshot is very fresh (age < CACHE_TTL), the first
+// request after a restart should always schedule a background refresh so
+// readers receive fully up-to-date content as soon as possible.
+const bootPrewarmedLocales = new Set<string>();
 
 const refreshInProgress: Record<string, boolean> = {};
 const inFlightFetches: Map<string, Promise<BlogPost[]>> = new Map();
@@ -714,6 +730,23 @@ async function fetchFeed(locale: string): Promise<BlogPost[]> {
 
   if (entry) {
     const age = now - entry.timestamp;
+
+    // Always schedule a background refresh on the first request after a cold
+    // start that was seeded from disk — even when the snapshot is very fresh
+    // (age < CACHE_TTL) — so readers get fully up-to-date content ASAP.
+    const needsBootRefresh = bootPrewarmedLocales.has(locale);
+    if (needsBootRefresh) {
+      bootPrewarmedLocales.delete(locale);
+      if (!refreshInProgress[locale]) {
+        refreshInProgress[locale] = true;
+        doFetchFeed(locale)
+          .catch((err) => logger.error({ locale, err }, "blog: boot refresh failed"))
+          .finally(() => {
+            refreshInProgress[locale] = false;
+          });
+      }
+      return entry.posts;
+    }
 
     if (age < CACHE_TTL) {
       return entry.posts;
