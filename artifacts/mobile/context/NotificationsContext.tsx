@@ -170,6 +170,9 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
                   await unregisterToken(storedToken);
                   await AsyncStorage.setItem(STORAGE_TOKEN_KEY, currentToken);
                 }
+                if (AppState.currentState === "active") {
+                  clearBadge(currentToken).catch(() => {});
+                }
               })
               .catch(() => {});
           }

@@ -328,7 +328,7 @@ router.post("/register", async (req, res) => {
 
 router.post("/clear-badge", (req, res) => {
   const { token } = req.body as { token?: string };
-  if (token && typeof token === "string") {
+  if (token && typeof token === "string" && isValidExpoToken(token)) {
     unreadCounts.set(token, 0);
   }
   res.json({ ok: true });
