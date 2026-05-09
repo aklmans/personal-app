@@ -561,8 +561,29 @@ async function doFetchFeed(locale: string): Promise<BlogPost[]> {
   let sitemapPosts: BlogPost[] = [];
   let sitemapScrapeCount = 0;
   let sitemapFromDisk = 0;
+  let evicted = 0;
   try {
     const sitemapUrls = await fetchSitemapPostUrls(locale);
+
+    // Reconcile: evict disk-cache entries for this locale whose URL is no longer in the sitemap.
+    // Scope to the current locale's URL namespace to avoid evicting entries that belong
+    // to other locales (whose sitemap was not fetched in this call).
+    const sitemapNormalized = new Set(sitemapUrls.map((u) => u.replace(/\/+$/, "")));
+    for (const key of _diskMetaCache.keys()) {
+      const isCurrentLocale =
+        locale === "zh-cn"
+          ? key.includes(`${SITE_BASE}/zh-cn/`)
+          : !key.includes(`${SITE_BASE}/zh-cn/`);
+      if (!isCurrentLocale) continue;
+      if (!sitemapNormalized.has(key.replace(/\/+$/, ""))) {
+        _diskMetaCache.delete(key);
+        evicted++;
+      }
+    }
+    if (evicted > 0) {
+      flushMetadataDiskCache().catch(() => {});
+    }
+
     const newUrls = sitemapUrls.filter(
       (u) => !rssPostLinks.has(u.replace(/\/+$/, ""))
     );
@@ -677,6 +698,7 @@ async function doFetchFeed(locale: string): Promise<BlogPost[]> {
       sitemapFromDisk,
       sitemapScrapeCount,
       sitemapFound: sitemapPosts.length,
+      evicted,
       totalPosts: posts.length,
       durationMs: now - t0,
     },
