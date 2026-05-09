@@ -989,6 +989,11 @@ export default function PostDetailScreen() {
     setSelectedQuote("");
   }, [post, selectedQuote]);
 
+  const themeColors = useMemo(
+    () => resolveThemeColors(colorTheme, colors.background, colors.text),
+    [colorTheme, colors.background, colors.text]
+  );
+
   const showCopyToast = useCallback(() => {
     if (copyToastTimerRef.current) clearTimeout(copyToastTimerRef.current);
     copyToastAnim.stopAnimation();
@@ -1042,6 +1047,8 @@ export default function PostDetailScreen() {
 
   useEffect(() => {
     navigation.setOptions({
+      headerStyle: { backgroundColor: themeColors.bg },
+      headerTintColor: themeColors.text,
       ...(post?.title
         ? {
             headerTitle: () => (
@@ -1050,7 +1057,7 @@ export default function PostDetailScreen() {
                 progressAnim={progressAnim}
                 primaryColor={colors.primary}
                 borderColor={colors.border}
-                textColor={colors.text}
+                textColor={themeColors.text}
               />
             ),
           }
@@ -1128,6 +1135,7 @@ export default function PostDetailScreen() {
     navigation,
     progressAnim,
     colors,
+    themeColors,
     decrease,
     increase,
     canDecrease,
@@ -1456,7 +1464,7 @@ export default function PostDetailScreen() {
   const related = post.related ?? [];
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.background }]}>
+    <View style={[styles.root, { backgroundColor: themeColors.bg }]}>
       {Platform.OS === "web" ? (
         hydrated ? (
           <iframe
@@ -1468,18 +1476,18 @@ export default function PostDetailScreen() {
               border: "none",
               width: "100%",
               height: "100%",
-              backgroundColor: colors.background,
+              backgroundColor: themeColors.bg,
             } as React.CSSProperties}
             title={post.title}
           />
         ) : (
-          <View style={{ flex: 1, backgroundColor: colors.background }} />
+          <View style={{ flex: 1, backgroundColor: themeColors.bg }} />
         )
       ) : hydrated ? (
         <WebView
           ref={webViewRef}
           source={{ html: htmlContent, baseUrl: post.link }}
-          style={[styles.webview, { backgroundColor: colors.background }]}
+          style={[styles.webview, { backgroundColor: themeColors.bg }]}
           originWhitelist={["*"]}
           scrollEnabled
           showsVerticalScrollIndicator={false}
@@ -1491,14 +1499,14 @@ export default function PostDetailScreen() {
           onLoadEnd={() => { restoreScrollPosition(); }}
         />
       ) : (
-        <View style={[styles.webview, { backgroundColor: colors.background }]} />
+        <View style={[styles.webview, { backgroundColor: themeColors.bg }]} />
       )}
 
       {(tags.length > 0 || related.length > 0) && (
         <View
           style={[
             styles.metaSection,
-            { backgroundColor: colors.background, borderTopColor: colors.border },
+            { backgroundColor: themeColors.bg, borderTopColor: colors.border },
           ]}
         >
           {tags.length > 0 && (
@@ -1680,7 +1688,7 @@ export default function PostDetailScreen() {
           styles.footer,
           {
             paddingBottom: bottomPad,
-            backgroundColor: colors.background,
+            backgroundColor: themeColors.bg,
             borderTopColor: colors.border,
           },
         ]}
