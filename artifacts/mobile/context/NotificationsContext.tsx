@@ -38,6 +38,7 @@ interface NotificationsContextValue {
   notifCategories: string[];
   setNotifCategories: (cats: string[]) => Promise<void>;
   availableCategories: string[];
+  refreshAvailableCategories: () => void;
 }
 
 const NotificationsContext = createContext<NotificationsContextValue>({
@@ -49,6 +50,7 @@ const NotificationsContext = createContext<NotificationsContextValue>({
   notifCategories: [],
   setNotifCategories: async () => {},
   availableCategories: [],
+  refreshAvailableCategories: () => {},
 });
 
 async function ensureAndroidChannel(): Promise<void> {
@@ -116,12 +118,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   const [isLoading, setIsLoading] = useState(false);
   const [notifCategories, setNotifCategoriesState] = useState<string[]>([]);
   const [availableCategories, setAvailableCategories] = useState<string[]>([]);
-  const router = useRouter();
-  const { locale } = useLanguage();
-  const notificationResponseListener = useRef<Notifications.EventSubscription | null>(null);
-  const coldStartHandled = useRef(false);
-
-  useEffect(() => {
+  const fetchAvailableCategories = useCallback(() => {
     fetch(`${API_BASE}/notifications/categories`)
       .then((r) => r.json())
       .then((data: unknown) => {
@@ -131,6 +128,14 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       })
       .catch(() => {});
   }, []);
+  const router = useRouter();
+  const { locale } = useLanguage();
+  const notificationResponseListener = useRef<Notifications.EventSubscription | null>(null);
+  const coldStartHandled = useRef(false);
+
+  useEffect(() => {
+    fetchAvailableCategories();
+  }, [fetchAvailableCategories]);
 
   useEffect(() => {
     AsyncStorage.multiGet([STORAGE_KEY, STORAGE_CATEGORIES_KEY, STORAGE_TOKEN_KEY])
@@ -236,12 +241,13 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   }, [locale, notifCategories]);
 
   const setNotifCategories = useCallback(async (cats: string[]) => {
-    setNotifCategoriesState(cats);
+    const normalized = [...new Set(cats.map((c) => c.trim().toLowerCase()).filter(Boolean))];
+    setNotifCategoriesState(normalized);
     try {
-      await AsyncStorage.setItem(STORAGE_CATEGORIES_KEY, JSON.stringify(cats));
+      await AsyncStorage.setItem(STORAGE_CATEGORIES_KEY, JSON.stringify(normalized));
       if (optedIn && Platform.OS !== "web") {
         const token = await AsyncStorage.getItem(STORAGE_TOKEN_KEY);
-        if (token) await registerToken(token, locale, cats);
+        if (token) await registerToken(token, locale, normalized);
       }
     } catch {
       // best-effort
@@ -267,7 +273,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
 
   return (
     <NotificationsContext.Provider
-      value={{ optedIn, permissionStatus, isLoading, enable, disable, notifCategories, setNotifCategories, availableCategories }}
+      value={{ optedIn, permissionStatus, isLoading, enable, disable, notifCategories, setNotifCategories, availableCategories, refreshAvailableCategories: fetchAvailableCategories }}
     >
       {children}
     </NotificationsContext.Provider>

@@ -12,7 +12,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 
 import { fonts } from "@/constants/fonts";
 import { useBookmarks } from "@/context/BookmarksContext";
@@ -77,7 +77,7 @@ export default function MoreScreen() {
   const router = useRouter();
   const { bookmarks, toggleBookmark } = useBookmarks();
   const { history, clearHistory } = useHistory();
-  const { optedIn, permissionStatus, isLoading, enable, disable, notifCategories, setNotifCategories, availableCategories } = useNotifications();
+  const { optedIn, permissionStatus, isLoading, enable, disable, notifCategories, setNotifCategories, availableCategories, refreshAvailableCategories } = useNotifications();
   const topPad = Platform.OS === "web" ? Math.max(insets.top, 67) : insets.top;
 
   const [bookmarkSort, setBookmarkSort] = useState<SortOrder>("newest");
@@ -109,6 +109,12 @@ export default function MoreScreen() {
       setActiveCategory(null);
     }
   }, [bookmarkCategories, activeCategory]);
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshAvailableCategories();
+    }, [refreshAvailableCategories])
+  );
 
   const allKnownCategories = useMemo(() => {
     const seen = new Set<string>(availableCategories);

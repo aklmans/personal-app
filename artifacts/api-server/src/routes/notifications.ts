@@ -152,7 +152,7 @@ async function fetchRssPostSlugs(locale: string): Promise<{ slug: string; title:
       const title = (titleM?.[1] ?? "").trim();
       const link = (linkM?.[1] ?? "").trim();
       const catMatches = [...block.matchAll(/<category>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/category>/gi)];
-      const categories = catMatches.map((m) => (m[1] ?? "").trim()).filter(Boolean);
+      const categories = catMatches.map((m) => (m[1] ?? "").trim().toLowerCase()).filter(Boolean);
       if (link) {
         items.push({ slug: extractSlugFromUrl(link), title, locale, categories });
       }
@@ -307,7 +307,10 @@ router.post("/register", async (req, res) => {
   }
   const resolvedLocale = locale && VALID_LOCALES.has(locale) ? locale : "en";
   const resolvedCategories: string[] = Array.isArray(categories)
-    ? (categories as unknown[]).filter((c): c is string => typeof c === "string")
+    ? (categories as unknown[])
+        .filter((c): c is string => typeof c === "string")
+        .map((c) => c.trim().toLowerCase())
+        .filter(Boolean)
     : [];
   registeredTokens.set(token, { locale: resolvedLocale, categories: resolvedCategories });
   await saveTokensToDisk();
