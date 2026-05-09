@@ -3,6 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as WebBrowser from "expo-web-browser";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Animated,
   Image,
   Platform,
   Pressable,
@@ -19,6 +20,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect, useRouter } from "expo-router";
 
 import HighlightedTitle from "@/components/HighlightedTitle";
+import { useCopyToast } from "@/hooks/useCopyToast";
 import { fonts } from "@/constants/fonts";
 import { useBookmarks } from "@/context/BookmarksContext";
 import { useHistory, type HistoryEntry } from "@/context/HistoryContext";
@@ -82,13 +84,22 @@ export default function MoreScreen() {
   const router = useRouter();
   const { bookmarks, toggleBookmark } = useBookmarks();
   const { history, clearHistory } = useHistory();
-  const { optedIn, permissionStatus, isLoading, enable, disable, notifCategories, setNotifCategories, availableCategories, refreshAvailableCategories, clearBadge } = useNotifications();
+  const { optedIn, permissionStatus, isLoading, enable, disable, notifCategories, setNotifCategories, availableCategories, refreshAvailableCategories, clearBadge, localeRegisteredAt } = useNotifications();
   const topPad = Platform.OS === "web" ? Math.max(insets.top, 67) : insets.top;
 
   const [bookmarkSort, setBookmarkSort] = useState<SortOrder>("newest");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [historyQuery, setHistoryQuery] = useState("");
+
+  const { showCopyToast: showNotifToast, copyToastVisible: notifToastVisible, copyToastAnim: notifToastAnim } = useCopyToast(2500);
+  const [notifToastMsg, setNotifToastMsg] = useState("");
+
+  useEffect(() => {
+    if (!localeRegisteredAt) return;
+    setNotifToastMsg(isZh ? "通知已切换为中文" : "Notifications updated for English");
+    showNotifToast();
+  }, [localeRegisteredAt]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     AsyncStorage.getItem("@bookmark_sort_v1")
@@ -235,8 +246,9 @@ export default function MoreScreen() {
   ];
 
   return (
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
     <ScrollView
-      style={[styles.root, { backgroundColor: colors.background }]}
+      style={styles.root}
       contentContainerStyle={[
         styles.content,
         {
@@ -961,6 +973,32 @@ export default function MoreScreen() {
         </Pressable>
       </View>
     </ScrollView>
+
+      {notifToastVisible && (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.notifToast,
+            {
+              opacity: notifToastAnim,
+              transform: [
+                {
+                  translateY: notifToastAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [12, 0],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <Feather name="bell" size={14} color="#ffffff" />
+          <Text style={[styles.notifToastText, { fontFamily: fonts.sans.semiBold }]}>
+            {notifToastMsg}
+          </Text>
+        </Animated.View>
+      )}
+    </View>
   );
 }
 
@@ -1232,5 +1270,26 @@ const styles = StyleSheet.create({
   },
   historyDot: {
     fontSize: 12,
+  },
+  notifToast: {
+    position: "absolute",
+    bottom: 90,
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(30,30,30,0.88)",
+    paddingVertical: 9,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    shadowColor: "#000",
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 6,
+  },
+  notifToastText: {
+    color: "#ffffff",
+    fontSize: 13,
   },
 });

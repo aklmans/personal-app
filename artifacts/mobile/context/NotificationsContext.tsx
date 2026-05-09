@@ -43,6 +43,7 @@ interface NotificationsContextValue {
   clearBadge: () => void;
   mutedSlugs: string[];
   mutePost: (slug: string) => Promise<void>;
+  localeRegisteredAt: number | null;
 }
 
 const NotificationsContext = createContext<NotificationsContextValue>({
@@ -58,6 +59,7 @@ const NotificationsContext = createContext<NotificationsContextValue>({
   clearBadge: () => {},
   mutedSlugs: [],
   mutePost: async () => {},
+  localeRegisteredAt: null,
 });
 
 async function ensureAndroidChannel(): Promise<void> {
@@ -152,6 +154,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   const [notifCategories, setNotifCategoriesState] = useState<string[]>([]);
   const [availableCategories, setAvailableCategories] = useState<string[]>([]);
   const [mutedSlugs, setMutedSlugsState] = useState<string[]>([]);
+  const [localeRegisteredAt, setLocaleRegisteredAt] = useState<number | null>(null);
   const fetchAvailableCategories = useCallback(() => {
     fetch(`${API_BASE}/notifications/categories`)
       .then((r) => r.json())
@@ -182,7 +185,8 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     AsyncStorage.getItem(STORAGE_TOKEN_KEY)
       .then(async (token) => {
         if (!token) return;
-        await registerToken(token, locale, notifCategories, mutedSlugsRef.current);
+        const ok = await registerToken(token, locale, notifCategories, mutedSlugsRef.current);
+        if (ok) setLocaleRegisteredAt(Date.now());
       })
       .catch(() => {});
   }, [locale, optedIn, notifCategories]);
@@ -376,6 +380,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
         clearBadge: clearBadgeCallback,
         mutedSlugs,
         mutePost,
+        localeRegisteredAt,
       }}
     >
       {children}
