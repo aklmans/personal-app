@@ -924,6 +924,8 @@ function buildHtml(
 </html>`;
 }
 
+const QUOTE_MAX_LENGTH = 300;
+
 export default function PostDetailScreen() {
   const colors = useColors();
   const { resolved } = useTheme();
@@ -1628,20 +1630,29 @@ export default function PostDetailScreen() {
             { backgroundColor: colors.card, borderColor: colors.border },
           ]}
         >
-          <Pressable
-            onPress={handleShareQuote}
-            accessibilityRole="button"
-            accessibilityLabel={isZh ? "分享引用" : "Share quote"}
-            style={({ pressed }) => [
-              styles.shareQuoteBtn,
-              { backgroundColor: pressed ? "#c05540" : colors.primary },
-            ]}
-          >
-            <Feather name="share-2" size={13} color="#ffffff" />
-            <Text style={[styles.shareQuoteBtnText, { fontFamily: fonts.sans.semiBold }]}>
-              {isZh ? "分享引用" : "Share quote"}
-            </Text>
-          </Pressable>
+          {selectedQuote.length > QUOTE_MAX_LENGTH ? (
+            <View style={styles.shareQuoteTooLong}>
+              <Feather name="alert-circle" size={13} color={colors.mutedForeground} />
+              <Text style={[styles.shareQuoteTooLongText, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}>
+                {isZh ? "引用过长，请选择较短的片段" : "Selection too long — try a shorter quote"}
+              </Text>
+            </View>
+          ) : (
+            <Pressable
+              onPress={handleShareQuote}
+              accessibilityRole="button"
+              accessibilityLabel={isZh ? "分享引用" : "Share quote"}
+              style={({ pressed }) => [
+                styles.shareQuoteBtn,
+                { backgroundColor: pressed ? "#c05540" : colors.primary },
+              ]}
+            >
+              <Feather name="share-2" size={13} color="#ffffff" />
+              <Text style={[styles.shareQuoteBtnText, { fontFamily: fonts.sans.semiBold }]}>
+                {isZh ? "分享引用" : "Share quote"}
+              </Text>
+            </Pressable>
+          )}
           <Text
             style={[styles.shareQuotePreview, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}
             numberOfLines={1}
@@ -1853,6 +1864,17 @@ const styles = StyleSheet.create({
   shareQuoteBtnText: {
     color: "#ffffff",
     fontSize: 13,
+  },
+  shareQuoteTooLong: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 4,
+    paddingVertical: 6,
+  },
+  shareQuoteTooLongText: {
+    fontSize: 12,
+    flexShrink: 1,
   },
   shareQuotePreview: {
     flex: 1,
