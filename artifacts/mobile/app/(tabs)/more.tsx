@@ -98,15 +98,15 @@ export default function MoreScreen() {
   }, [bookmarks]);
 
   const displayedBookmarks = useMemo(() => {
-    let list = activeCategory
-      ? bookmarks.filter((b) => b.categories.includes(activeCategory))
-      : bookmarks;
-    list = [...list].sort((a, b) => {
-      const ta = a.pubDate ? new Date(a.pubDate).getTime() : 0;
-      const tb = b.pubDate ? new Date(b.pubDate).getTime() : 0;
-      return bookmarkSort === "newest" ? tb - ta : ta - tb;
-    });
-    return list;
+    const indexed = bookmarks.map((b, i) => ({ b, i }));
+    const filtered = activeCategory
+      ? indexed.filter(({ b }) => b.categories.includes(activeCategory))
+      : indexed;
+    const sorted =
+      bookmarkSort === "newest"
+        ? filtered
+        : [...filtered].reverse();
+    return sorted.map(({ b }) => b);
   }, [bookmarks, activeCategory, bookmarkSort]);
 
   const openUrl = useCallback(async (url: string) => {
