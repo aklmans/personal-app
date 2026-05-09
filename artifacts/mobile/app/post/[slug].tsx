@@ -1760,7 +1760,8 @@ export default function PostDetailScreen() {
           style={[
             styles.resumeBanner,
             {
-              backgroundColor: colors.primary,
+              backgroundColor: themeColors.bg,
+              borderColor: `${themeColors.text}30`,
               marginHorizontal: 16,
               marginBottom: 8,
               opacity: bannerAnim,
@@ -1782,8 +1783,8 @@ export default function PostDetailScreen() {
             accessibilityLabel={isZh ? "从上次阅读处继续" : "Resume from where you left off"}
             style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", flex: 1, opacity: pressed ? 0.75 : 1 })}
           >
-            <Feather name="bookmark" size={14} color="#ffffff" style={{ marginRight: 6 }} />
-            <Text style={[styles.resumeBannerText, { fontFamily: fonts.sans.semiBold }]}>
+            <Feather name="bookmark" size={14} color={themeColors.text} style={{ marginRight: 6 }} />
+            <Text style={[styles.resumeBannerText, { fontFamily: fonts.sans.semiBold, color: themeColors.text }]}>
               {isZh ? "从上次阅读处继续" : "Resume from where you left off"}
             </Text>
           </Pressable>
@@ -1794,7 +1795,7 @@ export default function PostDetailScreen() {
             accessibilityLabel={isZh ? "关闭" : "Dismiss"}
             style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, marginLeft: 8 })}
           >
-            <Feather name="x" size={14} color="rgba(255,255,255,0.8)" />
+            <Feather name="x" size={14} color={`${themeColors.text}CC`} />
           </Pressable>
         </Animated.View>
       )}
@@ -1921,12 +1922,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     borderRadius: 10,
+    borderWidth: 1,
     paddingVertical: 11,
     paddingHorizontal: 14,
   },
   resumeBannerText: {
     flex: 1,
-    color: "#ffffff",
     fontSize: 13,
   },
   shareQuoteBar: {
