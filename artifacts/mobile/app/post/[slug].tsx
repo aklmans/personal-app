@@ -923,6 +923,7 @@ function buildHtml(
 <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js" data-manual></script>
 <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
 <script>${highlightScript}</script>
+<script>(function(){var selTimer;document.addEventListener('selectionchange',function(){clearTimeout(selTimer);selTimer=setTimeout(function(){var sel=window.getSelection?window.getSelection().toString().trim():'';window.parent.postMessage(JSON.stringify({t:'selection',text:sel}),'*');},300);});})()</script>
 </body>
 </html>`;
 }
@@ -1014,6 +1015,14 @@ export default function PostDetailScreen() {
   const handleShareQuote = useCallback(async () => {
     if (!post || !selectedQuote) return;
     const message = `"${selectedQuote}"\n\n— ${post.title}\n${post.link}`;
+    if (Platform.OS === "web") {
+      try {
+        await Clipboard.setStringAsync(message);
+        showCopyToast();
+      } catch {}
+      setSelectedQuote("");
+      return;
+    }
     try {
       await Share.share(
         Platform.OS === "ios"
@@ -1194,6 +1203,20 @@ export default function PostDetailScreen() {
       locale: post.locale,
     });
   }, [post, recordVisit]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+    const handleMessage = (event: MessageEvent) => {
+      try {
+        const msg = JSON.parse(event.data as string);
+        if (msg.t === "selection" && typeof msg.text === "string") {
+          setSelectedQuote(msg.text);
+        }
+      } catch {}
+    };
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
 
   useEffect(() => {
     if (Platform.OS !== "web" && webViewRef.current) {
@@ -1667,7 +1690,7 @@ export default function PostDetailScreen() {
         </View>
       )}
 
-      {Platform.OS !== "web" && selectedQuote.length > 0 && (
+      {selectedQuote.length > 0 && (
         <View
           style={[
             styles.shareQuoteBar,
@@ -1685,15 +1708,15 @@ export default function PostDetailScreen() {
             <Pressable
               onPress={handleShareQuote}
               accessibilityRole="button"
-              accessibilityLabel={isZh ? "分享引用" : "Share quote"}
+              accessibilityLabel={isZh ? (Platform.OS === "web" ? "复制引用" : "分享引用") : (Platform.OS === "web" ? "Copy quote" : "Share quote")}
               style={({ pressed }) => [
                 styles.shareQuoteBtn,
                 { backgroundColor: pressed ? "#c05540" : colors.primary },
               ]}
             >
-              <Feather name="share-2" size={13} color="#ffffff" />
+              <Feather name={Platform.OS === "web" ? "copy" : "share-2"} size={13} color="#ffffff" />
               <Text style={[styles.shareQuoteBtnText, { fontFamily: fonts.sans.semiBold }]}>
-                {isZh ? "分享引用" : "Share quote"}
+                {isZh ? (Platform.OS === "web" ? "复制引用" : "分享引用") : (Platform.OS === "web" ? "Copy quote" : "Share quote")}
               </Text>
             </Pressable>
           )}
