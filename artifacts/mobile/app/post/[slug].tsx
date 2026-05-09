@@ -970,6 +970,7 @@ export default function PostDetailScreen() {
   const resumeBannerPosRef = useRef<number | null>(null);
   const dismissBannerRef = useRef<() => void>(() => {});
   const isDismissingBannerRef = useRef(false);
+  const bannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { data, isLoading, isError } = useGetBlogPost(
     slug ?? "",
@@ -1354,10 +1355,23 @@ export default function PostDetailScreen() {
         tension: 55,
         friction: 9,
       }).start();
+      bannerTimerRef.current = setTimeout(() => {
+        dismissBannerRef.current();
+      }, 5000);
     } else {
+      if (bannerTimerRef.current) {
+        clearTimeout(bannerTimerRef.current);
+        bannerTimerRef.current = null;
+      }
       bannerAnim.setValue(0);
       setBannerVisible(false);
     }
+    return () => {
+      if (bannerTimerRef.current) {
+        clearTimeout(bannerTimerRef.current);
+        bannerTimerRef.current = null;
+      }
+    };
   }, [resumeBannerPos, bannerAnim]);
 
   const dismissBanner = useCallback(() => {
