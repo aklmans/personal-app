@@ -1207,6 +1207,7 @@ export default function PostDetailScreen() {
   useEffect(() => {
     if (Platform.OS !== "web") return;
     const handleMessage = (event: MessageEvent) => {
+      if (event.source !== iframeRef.current?.contentWindow) return;
       try {
         const msg = JSON.parse(event.data as string);
         if (msg.t === "selection" && typeof msg.text === "string") {
