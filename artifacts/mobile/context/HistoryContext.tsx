@@ -16,9 +16,6 @@ export interface HistoryEntry extends PostData {
   visitedAt: string;
 }
 
-function entryKey(entry: Pick<PostData, "slug" | "locale">): string {
-  return `${entry.locale}:${entry.slug}`;
-}
 
 interface HistoryContextValue {
   history: HistoryEntry[];
@@ -53,7 +50,18 @@ export function HistoryProvider({ children }: { children: React.ReactNode }) {
                   ? entry.pubDate
                   : fallback,
             }));
-            setHistory(migrated);
+            // Deduplicate by slug, keeping the most-recent visit per article
+            // (handles entries saved before this cross-locale fix was applied).
+            const seenSlugs = new Set<string>();
+            const deduped = migrated.filter((e) => {
+              if (seenSlugs.has(e.slug)) return false;
+              seenSlugs.add(e.slug);
+              return true;
+            });
+            setHistory(deduped);
+            if (deduped.length < migrated.length) {
+              AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(deduped)).catch(() => {});
+            }
           }
         }
       })
@@ -66,9 +74,11 @@ export function HistoryProvider({ children }: { children: React.ReactNode }) {
 
   const recordVisit = useCallback(
     (post: PostData) => {
-      const key = entryKey(post);
       setHistory((prev) => {
-        const filtered = prev.filter((p) => entryKey(p) !== key);
+        // Remove all existing entries for this slug regardless of locale so the
+        // same article never appears more than once in history when the reader
+        // switches language.
+        const filtered = prev.filter((p) => p.slug !== post.slug);
         const next: HistoryEntry[] = [
           { ...post, visitedAt: new Date().toISOString() },
           ...filtered,
@@ -86,8 +96,8 @@ export function HistoryProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const hasRead = useCallback(
-    (slug: string, locale: string) =>
-      history.some((p) => entryKey(p) === `${locale}:${slug}`),
+    (slug: string, _locale: string) =>
+      history.some((p) => p.slug === slug),
     [history]
   );
 
