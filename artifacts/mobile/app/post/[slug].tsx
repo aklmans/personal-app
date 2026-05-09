@@ -944,12 +944,14 @@ export default function PostDetailScreen() {
   const [sheetVisible, setSheetVisible] = useState(false);
   const [resumeBannerPos, setResumeBannerPos] = useState<number | null>(null);
   const [selectedQuote, setSelectedQuote] = useState("");
+  const [bannerVisible, setBannerVisible] = useState(false);
   const { isBookmarked, toggleBookmark } = useBookmarks();
   const { recordVisit } = useHistory();
 
   const safeLocale = (locale === "zh-cn" ? "zh-cn" : "en") as "en" | "zh-cn";
 
   const progressAnim = useRef(new Animated.Value(0)).current;
+  const bannerAnim = useRef(new Animated.Value(0)).current;
   const webViewRef = useRef<WebView>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const iframeScrollHandlerRef = useRef<(() => void) | null>(null);
@@ -959,6 +961,9 @@ export default function PostDetailScreen() {
   const restoredKeyRef = useRef<string | null>(null);
   const lastScrollPosRef = useRef<number>(0);
   const isRestoringRef = useRef(false);
+  const resumeBannerPosRef = useRef<number | null>(null);
+  const dismissBannerRef = useRef<() => void>(() => {});
+  const isDismissingBannerRef = useRef(false);
 
   const { data, isLoading, isError } = useGetBlogPost(
     slug ?? "",
@@ -1231,52 +1236,6 @@ export default function PostDetailScreen() {
     [post, colors, isDark, fontSize, lineSpacing, contentWidth, fontFamily, colorTheme]
   );
 
-  const onWebViewMessage = useCallback(
-    (event: { nativeEvent: { data: string } }) => {
-      try {
-        const msg = JSON.parse(event.nativeEvent.data);
-        if (msg.t === "selection" && typeof msg.text === "string") {
-          setSelectedQuote(msg.text);
-          return;
-        }
-        if (msg.t === "scroll" && typeof msg.p === "number") {
-          Animated.timing(progressAnim, {
-            toValue: msg.p,
-            duration: 80,
-            useNativeDriver: false,
-          }).start();
-          lastScrollPosRef.current = msg.p;
-          if (scrollStorageKey) {
-            if (msg.p >= 0.95) {
-              if (scrollSaveTimerRef.current) clearTimeout(scrollSaveTimerRef.current);
-              clearScrollPos(scrollStorageKey);
-            } else if (msg.p > 0.05) {
-              if (scrollSaveTimerRef.current) clearTimeout(scrollSaveTimerRef.current);
-              scrollSaveTimerRef.current = setTimeout(() => {
-                saveScrollPos(scrollStorageKey, msg.p);
-              }, 500);
-            }
-          }
-          setResumeBannerPos((prev) => {
-            if (prev !== null && !isRestoringRef.current && msg.p > prev + 0.02) return null;
-            return prev;
-          });
-        }
-      } catch {}
-    },
-    [progressAnim, scrollStorageKey]
-  );
-
-  const injectScrollToPos = useCallback((position: number, delay = 0) => {
-    if (!webViewRef.current) return;
-    isRestoringRef.current = true;
-    const script = delay > 0
-      ? `setTimeout(function(){var p=${position};var el=document.documentElement;var total=(el.scrollHeight||document.body.scrollHeight)-(el.clientHeight||window.innerHeight);if(total>0){window.scrollTo(0,Math.round(p*total));}},${delay});true;`
-      : `(function(){var p=${position};var el=document.documentElement;var total=(el.scrollHeight||document.body.scrollHeight)-(el.clientHeight||window.innerHeight);if(total>0){window.scrollTo(0,Math.round(p*total));}})();true;`;
-    webViewRef.current.injectJavaScript(script);
-    setTimeout(() => { isRestoringRef.current = false; }, delay + 1200);
-  }, []);
-
   const webScrollToPos = useCallback((position: number, delay = 0) => {
     const iframe = iframeRef.current;
     if (!iframe) return;
@@ -1290,17 +1249,6 @@ export default function PostDetailScreen() {
     if (delay > 0) setTimeout(doScroll, delay);
     else doScroll();
   }, []);
-
-  const handleResumeTap = useCallback(() => {
-    if (resumeBannerPos === null) return;
-    if (Platform.OS === "web") {
-      webScrollToPos(resumeBannerPos);
-    } else {
-      if (!webViewRef.current) return;
-      injectScrollToPos(resumeBannerPos);
-    }
-    setResumeBannerPos(null);
-  }, [resumeBannerPos, injectScrollToPos, webScrollToPos]);
 
   const onIframeLoad = useCallback(() => {
     const iframe = iframeRef.current;
@@ -1331,7 +1279,7 @@ export default function PostDetailScreen() {
         if (scrollSaveTimerRef.current) clearTimeout(scrollSaveTimerRef.current);
         scrollSaveTimerRef.current = null;
         clearScrollPos(scrollStorageKey);
-        setResumeBannerPos(null);
+        dismissBannerRef.current();
         return;
       }
       if (p > 0.05) {
@@ -1340,10 +1288,167 @@ export default function PostDetailScreen() {
           saveScrollPos(scrollStorageKey, p);
         }, 500);
       }
-      setResumeBannerPos((prev) => {
-        if (prev !== null && p > prev + 0.02) return null;
-        return prev;
+      if (
+        resumeBannerPosRef.current !== null &&
+        !isRestoringRef.current &&
+        p > resumeBannerPosRef.current + 0.02
+      ) {
+        dismissBannerRef.current();
+      }
+    };
+    cw.addEventListener("scroll", handleScroll, { passive: true });
+    iframeScrollHandlerRef.current = handleScroll;
+    iframeContentWindowRef.current = cw;
+  }, [scrollStorageKey, webScrollToPos, progressAnim]);
+
+  const onWebViewMessage = useCallback(
+    (event: { nativeEvent: { data: string } }) => {
+      try {
+        const msg = JSON.parse(event.nativeEvent.data);
+        if (msg.t === "selection" && typeof msg.text === "string") {
+          setSelectedQuote(msg.text);
+          return;
+        }
+        if (msg.t === "scroll" && typeof msg.p === "number") {
+          Animated.timing(progressAnim, {
+            toValue: msg.p,
+            duration: 80,
+            useNativeDriver: false,
+          }).start();
+          lastScrollPosRef.current = msg.p;
+          if (scrollStorageKey) {
+            if (msg.p >= 0.95) {
+              if (scrollSaveTimerRef.current) clearTimeout(scrollSaveTimerRef.current);
+              clearScrollPos(scrollStorageKey);
+            } else if (msg.p > 0.05) {
+              if (scrollSaveTimerRef.current) clearTimeout(scrollSaveTimerRef.current);
+              scrollSaveTimerRef.current = setTimeout(() => {
+                saveScrollPos(scrollStorageKey, msg.p);
+              }, 500);
+            }
+          }
+          if (
+            resumeBannerPosRef.current !== null &&
+            !isRestoringRef.current &&
+            msg.p > resumeBannerPosRef.current + 0.02
+          ) {
+            dismissBannerRef.current();
+          }
+        }
+      } catch {}
+    },
+    [progressAnim, scrollStorageKey]
+  );
+
+  const injectScrollToPos = useCallback((position: number, delay = 0) => {
+    if (!webViewRef.current) return;
+    isRestoringRef.current = true;
+    const script = delay > 0
+      ? `setTimeout(function(){var p=${position};var el=document.documentElement;var total=(el.scrollHeight||document.body.scrollHeight)-(el.clientHeight||window.innerHeight);if(total>0){window.scrollTo(0,Math.round(p*total));}},${delay});true;`
+      : `(function(){var p=${position};var el=document.documentElement;var total=(el.scrollHeight||document.body.scrollHeight)-(el.clientHeight||window.innerHeight);if(total>0){window.scrollTo(0,Math.round(p*total));}})();true;`;
+    webViewRef.current.injectJavaScript(script);
+    setTimeout(() => { isRestoringRef.current = false; }, delay + 1200);
+  }, []);
+
+  const webScrollToPos = useCallback((position: number, delay = 0) => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+    const doScroll = () => {
+      const cw = iframe.contentWindow;
+      if (!cw) return;
+      const doc = cw.document.documentElement;
+      const total = doc.scrollHeight - doc.clientHeight;
+      if (total > 0) cw.scrollTo({ top: Math.round(position * total) });
+    };
+    if (delay > 0) setTimeout(doScroll, delay);
+    else doScroll();
+  }, []);
+
+  useEffect(() => {
+    resumeBannerPosRef.current = resumeBannerPos;
+    if (resumeBannerPos !== null) {
+      isDismissingBannerRef.current = false;
+      setBannerVisible(true);
+      bannerAnim.setValue(0);
+      Animated.spring(bannerAnim, {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 55,
+        friction: 9,
+      }).start();
+    } else {
+      bannerAnim.setValue(0);
+      setBannerVisible(false);
+    }
+  }, [resumeBannerPos, bannerAnim]);
+
+  const dismissBanner = useCallback(() => {
+    if (isDismissingBannerRef.current) return;
+    isDismissingBannerRef.current = true;
+    Animated.timing(bannerAnim, {
+      toValue: 0,
+      duration: 220,
+      useNativeDriver: true,
+    }).start(() => {
+      isDismissingBannerRef.current = false;
+      setResumeBannerPos(null);
+    });
+  }, [bannerAnim]);
+
+  dismissBannerRef.current = dismissBanner;
+
+  const handleResumeTap = useCallback(() => {
+    if (resumeBannerPos === null) return;
+    if (Platform.OS === "web") {
+      webScrollToPos(resumeBannerPos);
+    } else {
+      if (!webViewRef.current) return;
+      injectScrollToPos(resumeBannerPos);
+    }
+    dismissBanner();
+  }, [resumeBannerPos, injectScrollToPos, webScrollToPos, dismissBanner]);
+
+  const onIframeLoad = useCallback(() => {
+    const iframe = iframeRef.current;
+    if (!iframe?.contentWindow) return;
+    // Remove any previous scroll listener before attaching a new one
+    if (iframeScrollHandlerRef.current && iframeContentWindowRef.current) {
+      iframeContentWindowRef.current.removeEventListener("scroll", iframeScrollHandlerRef.current);
+      iframeScrollHandlerRef.current = null;
+      iframeContentWindowRef.current = null;
+    }
+    const cw = iframe.contentWindow;
+    if (scrollStorageKey && restoredKeyRef.current !== scrollStorageKey) {
+      restoredKeyRef.current = scrollStorageKey;
+      loadScrollPos(scrollStorageKey).then((position) => {
+        if (position == null || position <= 0.05) return;
+        webScrollToPos(position, 400);
       });
+    }
+    const handleScroll = () => {
+      const doc = cw.document.documentElement;
+      const total = doc.scrollHeight - doc.clientHeight;
+      if (total <= 0) return;
+      const p = Math.min(1, Math.max(0, doc.scrollTop / total));
+      lastScrollPosRef.current = p;
+      Animated.timing(progressAnim, { toValue: p, duration: 80, useNativeDriver: false }).start();
+      if (!scrollStorageKey) return;
+      if (p >= 0.95) {
+        if (scrollSaveTimerRef.current) clearTimeout(scrollSaveTimerRef.current);
+        scrollSaveTimerRef.current = null;
+        clearScrollPos(scrollStorageKey);
+        dismissBannerRef.current();
+        return;
+      }
+      if (p > 0.05) {
+        if (scrollSaveTimerRef.current) clearTimeout(scrollSaveTimerRef.current);
+        scrollSaveTimerRef.current = setTimeout(() => {
+          saveScrollPos(scrollStorageKey, p);
+        }, 500);
+      }
+      if (resumeBannerPosRef.current !== null && p > resumeBannerPosRef.current + 0.02) {
+        dismissBannerRef.current();
+      }
     };
     cw.addEventListener("scroll", handleScroll, { passive: true });
     iframeScrollHandlerRef.current = handleScroll;
@@ -1572,11 +1677,22 @@ export default function PostDetailScreen() {
         </View>
       )}
 
-      {resumeBannerPos !== null && (
-        <View
+      {bannerVisible && Platform.OS !== "web" && (
+        <Animated.View
           style={[
             styles.resumeBanner,
-            { backgroundColor: colors.primary, marginHorizontal: 16, marginBottom: 8 },
+            {
+              backgroundColor: colors.primary,
+              marginHorizontal: 16,
+              marginBottom: 8,
+              opacity: bannerAnim,
+              transform: [{
+                translateY: bannerAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [60, 0],
+                }),
+              }],
+            },
           ]}
         >
           <Pressable
@@ -1591,7 +1707,7 @@ export default function PostDetailScreen() {
             </Text>
           </Pressable>
           <Pressable
-            onPress={() => setResumeBannerPos(null)}
+            onPress={dismissBanner}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             accessibilityRole="button"
             accessibilityLabel={isZh ? "关闭" : "Dismiss"}
@@ -1599,7 +1715,7 @@ export default function PostDetailScreen() {
           >
             <Feather name="x" size={14} color="rgba(255,255,255,0.8)" />
           </Pressable>
-        </View>
+        </Animated.View>
       )}
 
       <View
