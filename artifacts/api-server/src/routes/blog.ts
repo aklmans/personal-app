@@ -406,13 +406,21 @@ async function loadMetadataDiskCache(): Promise<void> {
     const parsed = JSON.parse(raw) as Record<string, DiskMetadataEntry>;
     const now = Date.now();
     let loaded = 0;
+    let stale = 0;
     for (const [url, entry] of Object.entries(parsed)) {
+      // Load ALL entries — including expired ones — so they remain available
+      // in _diskMetaCache as a last-resort stale fallback during extended outages
+      // (e.g. after a server restart while RSS + sitemap are still unreachable).
+      // Normal lookups via getMetadataFromDiskCache() still evict and skip expired
+      // entries; only the allowExpired:true path serves them.
+      _diskMetaCache.set(url, entry);
       if (now - entry.savedAt < METADATA_DISK_TTL) {
-        _diskMetaCache.set(url, entry);
         loaded++;
+      } else {
+        stale++;
       }
     }
-    logger.info({ loaded }, "blog: metadata disk cache loaded");
+    logger.info({ loaded, stale }, "blog: metadata disk cache loaded");
   } catch {
     // File missing or corrupt — start fresh, not an error
   }
@@ -570,11 +578,16 @@ async function doFetchFeed(locale: string): Promise<BlogPost[]> {
           )
           .map((r) => r.value);
 
-        const savedAt = Date.now();
-        for (const post of freshPosts) {
-          _diskMetaCache.set(post.link.replace(/\/+$/, ""), { post, savedAt });
+        if (freshPosts.length > 0) {
+          // Only flush when we have new data to write; skipping the flush when
+          // freshPosts is empty preserves expired entries in _diskMetaCache so
+          // the stale fallback below can still find them.
+          const savedAt = Date.now();
+          for (const post of freshPosts) {
+            _diskMetaCache.set(post.link.replace(/\/+$/, ""), { post, savedAt });
+          }
+          flushMetadataDiskCache().catch(() => {});
         }
-        flushMetadataDiskCache().catch(() => {});
 
         // toFetch failure branch: all live scrapes failed and no fresh disk hits
         // either — serve stale disk metadata (including expired entries) so readers
