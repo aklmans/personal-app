@@ -982,35 +982,74 @@ export default function PostDetailScreen() {
   const isDismissingBannerRef = useRef(false);
   const bannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bannerSwipeDy = useRef(new Animated.Value(0)).current;
+  const bannerSwipeDx = useRef(new Animated.Value(0)).current;
+  const bannerSwipeDirectionRef = useRef<"h" | "v" | null>(null);
   const [showSwipeHint, setShowSwipeHint] = useState(false);
   const swipeHintAnim = useRef(new Animated.Value(0)).current;
   const bannerPanResponder = useRef(
     PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gs) =>
-        gs.dy > 5 && Math.abs(gs.dy) > Math.abs(gs.dx),
+      onMoveShouldSetPanResponder: (_, gs) => {
+        return Math.abs(gs.dx) > 5 || gs.dy > 5;
+      },
+      onPanResponderGrant: () => {
+        bannerSwipeDirectionRef.current = null;
+      },
       onPanResponderMove: (_, gs) => {
-        bannerSwipeDy.setValue(Math.max(0, gs.dy));
+        const adx = Math.abs(gs.dx);
+        const ady = Math.abs(gs.dy);
+        if (!bannerSwipeDirectionRef.current && (adx > 5 || ady > 5)) {
+          bannerSwipeDirectionRef.current = adx > ady ? "h" : "v";
+        }
+        if (bannerSwipeDirectionRef.current === "h") {
+          bannerSwipeDx.setValue(gs.dx);
+          bannerSwipeDy.setValue(0);
+        } else if (bannerSwipeDirectionRef.current === "v") {
+          bannerSwipeDy.setValue(Math.max(0, gs.dy));
+          bannerSwipeDx.setValue(0);
+        }
       },
       onPanResponderRelease: (_, gs) => {
-        if (gs.dy >= 60) {
+        const dir = bannerSwipeDirectionRef.current;
+        bannerSwipeDirectionRef.current = null;
+        if (dir === "h" && Math.abs(gs.dx) >= 80) {
+          markHintSeenRef.current();
+          dismissBannerRef.current();
+        } else if (dir === "v" && gs.dy >= 60) {
           markHintSeenRef.current();
           dismissBannerRef.current();
         } else {
+          Animated.parallel([
+            Animated.spring(bannerSwipeDy, {
+              toValue: 0,
+              useNativeDriver: true,
+              tension: 80,
+              friction: 10,
+            }),
+            Animated.spring(bannerSwipeDx, {
+              toValue: 0,
+              useNativeDriver: true,
+              tension: 80,
+              friction: 10,
+            }),
+          ]).start();
+        }
+      },
+      onPanResponderTerminate: () => {
+        bannerSwipeDirectionRef.current = null;
+        Animated.parallel([
           Animated.spring(bannerSwipeDy, {
             toValue: 0,
             useNativeDriver: true,
             tension: 80,
             friction: 10,
-          }).start();
-        }
-      },
-      onPanResponderTerminate: () => {
-        Animated.spring(bannerSwipeDy, {
-          toValue: 0,
-          useNativeDriver: true,
-          tension: 80,
-          friction: 10,
-        }).start();
+          }),
+          Animated.spring(bannerSwipeDx, {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 80,
+            friction: 10,
+          }),
+        ]).start();
       },
     })
   ).current;
@@ -1413,6 +1452,7 @@ export default function PostDetailScreen() {
     if (resumeBannerPos !== null) {
       isDismissingBannerRef.current = false;
       bannerSwipeDy.setValue(0);
+      bannerSwipeDx.setValue(0);
       setBannerVisible(true);
       bannerAnim.setValue(0);
       Animated.spring(bannerAnim, {
@@ -1791,15 +1831,18 @@ export default function PostDetailScreen() {
               marginHorizontal: 16,
               marginBottom: 8,
               opacity: bannerAnim,
-              transform: [{
-                translateY: Animated.add(
-                  bannerAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [60, 0],
-                  }),
-                  bannerSwipeDy,
-                ),
-              }],
+              transform: [
+                { translateX: bannerSwipeDx },
+                {
+                  translateY: Animated.add(
+                    bannerAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [60, 0],
+                    }),
+                    bannerSwipeDy,
+                  ),
+                },
+              ],
             },
           ]}
         >
