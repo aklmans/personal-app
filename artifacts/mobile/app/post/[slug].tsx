@@ -3,7 +3,7 @@ import { useGetBlogPost, queryOpts } from "@workspace/api-client-react";
 import type { RelatedPost } from "@workspace/api-client-react";
 import * as Clipboard from "expo-clipboard";
 import * as WebBrowser from "expo-web-browser";
-import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
@@ -24,6 +24,7 @@ import WebView from "react-native-webview";
 import { fonts } from "@/constants/fonts";
 import { useBookmarks } from "@/context/BookmarksContext";
 import { useHistory } from "@/context/HistoryContext";
+import { useNotifications } from "@/context/NotificationsContext";
 import { useColors } from "@/hooks/useColors";
 import { useTheme } from "@/context/ThemeContext";
 import { useLanguage } from "@/context/LanguageContext";
@@ -957,6 +958,9 @@ export default function PostDetailScreen() {
   const { showCopyToast, copyToastVisible, copyToastAnim } = useCopyToast();
   const { isBookmarked, toggleBookmark } = useBookmarks();
   const { recordVisit } = useHistory();
+  const { clearBadge } = useNotifications();
+
+  useFocusEffect(useCallback(() => { clearBadge(); }, [clearBadge]));
 
   const safeLocale = (locale === "zh-cn" ? "zh-cn" : "en") as "en" | "zh-cn";
 
