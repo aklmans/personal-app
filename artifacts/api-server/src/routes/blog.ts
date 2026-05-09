@@ -200,11 +200,24 @@ function loadContentCacheFromDisk(): void {
   }
 }
 
+function evictOldestContentIfNeeded(): void {
+  if (contentDiskTs.size <= CONTENT_DISK_MAX_ENTRIES) return;
+  // Sort ascending by timestamp so oldest entries are first.
+  const entries = Array.from(contentDiskTs.entries()).sort((a, b) => a[1] - b[1]);
+  const toEvict = entries.slice(0, entries.length - CONTENT_DISK_MAX_ENTRIES);
+  for (const [evictUrl] of toEvict) {
+    contentDiskTs.delete(evictUrl);
+    contentCache.delete(evictUrl);
+    fs.unlink(contentDiskCachePath(evictUrl), () => {});
+  }
+}
+
 function saveContentToDisk(url: string, html: string, ts: number): void {
   try {
     fs.mkdirSync(CONTENT_DISK_CACHE_DIR, { recursive: true });
     fs.writeFileSync(contentDiskCachePath(url), JSON.stringify({ url, html, ts }), "utf8");
     contentDiskTs.set(url, ts);
+    evictOldestContentIfNeeded();
   } catch {
     // fire-and-forget, ignore write errors
   }
