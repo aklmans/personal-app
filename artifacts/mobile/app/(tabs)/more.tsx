@@ -82,7 +82,7 @@ export default function MoreScreen() {
   const { locale, toggleLocale, isZh } = useLanguage();
   const { preference, setPreference } = useTheme();
   const router = useRouter();
-  const { bookmarks, toggleBookmark } = useBookmarks();
+  const { bookmarks, hydrated: bookmarksHydrated, toggleBookmark } = useBookmarks();
   const { history, clearHistory } = useHistory();
   const { optedIn, permissionStatus, isLoading, enable, disable, notifCategories, setNotifCategories, availableCategories, refreshAvailableCategories, clearBadge, localeRegisteredAt } = useNotifications();
   const topPad = Platform.OS === "web" ? Math.max(insets.top, 67) : insets.top;
@@ -109,9 +109,26 @@ export default function MoreScreen() {
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    AsyncStorage.getItem("@bookmark_category_v1")
+      .then((val) => {
+        if (val) setActiveCategory(val);
+      })
+      .catch(() => {});
+  }, []);
+
   const handleSetBookmarkSort = useCallback((sort: SortOrder) => {
     setBookmarkSort(sort);
     AsyncStorage.setItem("@bookmark_sort_v1", sort).catch(() => {});
+  }, []);
+
+  const handleSetActiveCategory = useCallback((cat: string | null) => {
+    setActiveCategory(cat);
+    if (cat === null) {
+      AsyncStorage.removeItem("@bookmark_category_v1").catch(() => {});
+    } else {
+      AsyncStorage.setItem("@bookmark_category_v1", cat).catch(() => {});
+    }
   }, []);
 
   const bookmarkCategories = useMemo(() => {
@@ -140,10 +157,11 @@ export default function MoreScreen() {
   }, [bookmarks, activeCategory, bookmarkSort, searchQuery]);
 
   React.useEffect(() => {
+    if (!bookmarksHydrated) return;
     if (activeCategory !== null && !bookmarkCategories.includes(activeCategory)) {
-      setActiveCategory(null);
+      handleSetActiveCategory(null);
     }
-  }, [bookmarkCategories, activeCategory]);
+  }, [bookmarksHydrated, bookmarkCategories, activeCategory, handleSetActiveCategory]);
 
   useFocusEffect(
     useCallback(() => {
@@ -355,7 +373,7 @@ export default function MoreScreen() {
             contentContainerStyle={styles.chipRow}
           >
             <Pressable
-              onPress={() => setActiveCategory(null)}
+              onPress={() => handleSetActiveCategory(null)}
               style={[
                 styles.chip,
                 {
@@ -379,7 +397,7 @@ export default function MoreScreen() {
             {bookmarkCategories.map((cat) => (
               <Pressable
                 key={cat}
-                onPress={() => setActiveCategory(activeCategory === cat ? null : cat)}
+                onPress={() => handleSetActiveCategory(activeCategory === cat ? null : cat)}
                 style={[
                   styles.chip,
                   {

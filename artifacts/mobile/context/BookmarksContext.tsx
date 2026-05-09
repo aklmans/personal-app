@@ -17,18 +17,21 @@ function postKey(post: Pick<PostData, "slug" | "locale">): string {
 
 interface BookmarksContextValue {
   bookmarks: PostData[];
+  hydrated: boolean;
   isBookmarked: (slug: string, locale: string) => boolean;
   toggleBookmark: (post: PostData) => void;
 }
 
 const BookmarksContext = createContext<BookmarksContextValue>({
   bookmarks: [],
+  hydrated: false,
   isBookmarked: () => false,
   toggleBookmark: () => {},
 });
 
 export function BookmarksProvider({ children }: { children: React.ReactNode }) {
   const [bookmarks, setBookmarks] = useState<PostData[]>([]);
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY)
@@ -38,7 +41,8 @@ export function BookmarksProvider({ children }: { children: React.ReactNode }) {
           if (Array.isArray(parsed)) setBookmarks(parsed);
         }
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setHydrated(true));
   }, []);
 
   const persist = useCallback((next: PostData[]) => {
@@ -67,7 +71,7 @@ export function BookmarksProvider({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <BookmarksContext.Provider value={{ bookmarks, isBookmarked, toggleBookmark }}>
+    <BookmarksContext.Provider value={{ bookmarks, hydrated, isBookmarked, toggleBookmark }}>
       {children}
     </BookmarksContext.Provider>
   );
