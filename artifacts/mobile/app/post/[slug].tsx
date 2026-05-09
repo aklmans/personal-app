@@ -527,6 +527,12 @@ function resolveThemeColors(
   return { bg: defaultBg, text: defaultText };
 }
 
+function resolveHighlightColor(colorTheme: ColorTheme): string {
+  if (colorTheme === "sepia") return "rgba(160,100,40,0.38)";
+  if (colorTheme === "high-contrast") return "rgba(255,220,0,0.45)";
+  return "rgba(218,119,86,0.35)";
+}
+
 function buildInjectedJS(
   fontSize: number,
   lineSpacing: number,
@@ -542,6 +548,7 @@ function buildInjectedJS(
     ? "'Inter', system-ui, sans-serif"
     : "'Lora', Georgia, 'Times New Roman', serif";
   const { bg, text } = resolveThemeColors(colorTheme, defaultBg, defaultText);
+  const highlightColor = resolveHighlightColor(colorTheme);
   return `(function() {
   document.documentElement.style.setProperty('font-size', '${fontSize}px', 'important');
   document.body.style.lineHeight = '${lineSpacing}';
@@ -554,6 +561,7 @@ function buildInjectedJS(
   document.body.style.backgroundColor = '${bg}';
   document.body.style.color = '${text}';
   document.documentElement.style.backgroundColor = '${bg}';
+  document.documentElement.style.setProperty('--highlight-color', '${highlightColor}');
   function send() {
     var el = document.documentElement;
     var top = el.scrollTop || document.body.scrollTop || 0;
@@ -1075,7 +1083,7 @@ export default function PostDetailScreen() {
       setSelectedQuote("");
       return;
     }
-    const injectQuoteHighlight = `(function(){var sel=window.getSelection();if(!sel||sel.rangeCount===0)return;var range=sel.getRangeAt(0);var mark=document.createElement('span');mark.style.cssText='background:rgba(218,119,86,0.35);border-radius:2px;transition:background 1.5s ease-out';try{var frag=range.extractContents();mark.appendChild(frag);range.insertNode(mark);sel.removeAllRanges();setTimeout(function(){mark.style.background='transparent';setTimeout(function(){var p=mark.parentNode;if(p){while(mark.firstChild)p.insertBefore(mark.firstChild,mark);p.removeChild(mark);}},1500);},50);}catch(err){document.body.style.transition='background 0.3s ease';document.body.style.background='rgba(218,119,86,0.12)';setTimeout(function(){document.body.style.background='';},700);}})();true;`;
+    const injectQuoteHighlight = `(function(){var hc=getComputedStyle(document.documentElement).getPropertyValue('--highlight-color').trim()||'rgba(218,119,86,0.35)';var sel=window.getSelection();if(!sel||sel.rangeCount===0)return;var range=sel.getRangeAt(0);var mark=document.createElement('span');mark.style.cssText='background:'+hc+';border-radius:2px;transition:background 1.5s ease-out';try{var frag=range.extractContents();mark.appendChild(frag);range.insertNode(mark);sel.removeAllRanges();setTimeout(function(){mark.style.background='transparent';setTimeout(function(){var p=mark.parentNode;if(p){while(mark.firstChild)p.insertBefore(mark.firstChild,mark);p.removeChild(mark);}},1500);},50);}catch(err){document.body.style.transition='background 0.3s ease';document.body.style.background=hc;setTimeout(function(){document.body.style.background='';},700);}})();true;`;
     try {
       const result = await Share.share(
         Platform.OS === "ios"
@@ -1374,12 +1382,14 @@ export default function PostDetailScreen() {
       const { bg, text } = resolveThemeColors(colorTheme, colors.background, colors.text);
       const primary = colors.primary;
       const muted = colors.mutedForeground;
+      const highlightColor = resolveHighlightColor(colorTheme);
       webViewRef.current.injectJavaScript(
         `(function(){` +
         `document.body.style.transition='background-color 0.25s, color 0.25s';` +
         `document.body.style.backgroundColor='${bg}';` +
         `document.body.style.color='${text}';` +
         `document.documentElement.style.backgroundColor='${bg}';` +
+        `document.documentElement.style.setProperty('--highlight-color','${highlightColor}');` +
         `var headings=document.querySelectorAll('h1,h2,h3,h4,h5,h6');` +
         `for(var i=0;i<headings.length;i++){headings[i].style.transition='color 0.25s';headings[i].style.color='${text}';}` +
         `var links=document.querySelectorAll('a');` +
