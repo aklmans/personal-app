@@ -758,11 +758,12 @@ function buildHtml(
       line-height: 1.3;
       margin-top: 1.8em;
       margin-bottom: 0.5em;
+      transition: color 0.25s;
     }
     h1 { font-size: 1.6em; }
     h2 { font-size: 1.35em; border-bottom: 1px solid ${border}; padding-bottom: 0.25em; }
     h3 { font-size: 1.15em; }
-    a { color: ${primary}; text-decoration: none; }
+    a { color: ${primary}; text-decoration: none; transition: color 0.25s; }
     a:hover { text-decoration: underline; }
     p { margin: 0 0 1.25em; }
     img { max-width: 100%; height: auto; border-radius: 8px; display: block; margin: 1.2em auto; }
@@ -889,6 +890,7 @@ function buildHtml(
       padding: 6px 0 6px 18px;
       color: ${muted};
       font-style: italic;
+      transition: color 0.25s, border-color 0.25s;
     }
     blockquote p { margin: 0; }
     hr {
@@ -1302,11 +1304,24 @@ export default function PostDetailScreen() {
   useEffect(() => {
     if (Platform.OS !== "web" && webViewRef.current) {
       const { bg, text } = resolveThemeColors(colorTheme, colors.background, colors.text);
+      const primary = colors.primary;
+      const muted = colors.mutedForeground;
       webViewRef.current.injectJavaScript(
-        `document.body.style.transition='background-color 0.25s, color 0.25s';document.body.style.backgroundColor='${bg}';document.body.style.color='${text}';document.documentElement.style.backgroundColor='${bg}';true;`
+        `(function(){` +
+        `document.body.style.transition='background-color 0.25s, color 0.25s';` +
+        `document.body.style.backgroundColor='${bg}';` +
+        `document.body.style.color='${text}';` +
+        `document.documentElement.style.backgroundColor='${bg}';` +
+        `var headings=document.querySelectorAll('h1,h2,h3,h4,h5,h6');` +
+        `for(var i=0;i<headings.length;i++){headings[i].style.transition='color 0.25s';headings[i].style.color='${text}';}` +
+        `var links=document.querySelectorAll('a');` +
+        `for(var i=0;i<links.length;i++){links[i].style.transition='color 0.25s';links[i].style.color='${primary}';}` +
+        `var bqs=document.querySelectorAll('blockquote');` +
+        `for(var i=0;i<bqs.length;i++){bqs[i].style.transition='color 0.25s, border-color 0.25s';bqs[i].style.color='${muted}';bqs[i].style.borderLeftColor='${primary}';}` +
+        `})();true;`
       );
     }
-  }, [colorTheme, colors.background, colors.text]);
+  }, [colorTheme, colors.background, colors.text, colors.primary, colors.mutedForeground]);
 
   const htmlContent = useMemo(
     () => (post ? buildHtml(post.content ?? "", colors, isDark, 17, 1.85, "full", "serif", colorTheme) : ""),
