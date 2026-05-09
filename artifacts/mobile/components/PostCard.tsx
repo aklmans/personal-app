@@ -22,6 +22,7 @@ export interface PostData {
   categories: string[];
   readingTime?: number | null;
   locale: string;
+  stale?: boolean;
 }
 
 interface PostCardProps {
@@ -114,6 +115,13 @@ export function PostCard({ post, onPress }: PostCardProps) {
                 {post.readingTime} min read
               </Text>
             )}
+            {post.stale && (
+              <View style={[styles.stalePill, { backgroundColor: colors.muted }]}>
+                <Text style={[styles.staleText, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}>
+                  {post.locale === "zh-cn" ? "已缓存" : "Cached"}
+                </Text>
+              </View>
+            )}
           </View>
           <Pressable
             onPress={(e) => {
@@ -187,5 +195,15 @@ const styles = StyleSheet.create({
   },
   bookmarkBtn: {
     padding: 2,
+  },
+  stalePill: {
+    marginLeft: 6,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  staleText: {
+    fontSize: 10,
+    letterSpacing: 0.2,
   },
 });

@@ -30,6 +30,7 @@ interface BlogPost {
   content: string;
   series: string | null;
   seriesSlug: string | null;
+  stale?: boolean;
 }
 
 interface BlogTaxonomy {
@@ -689,7 +690,7 @@ async function doFetchFeed(locale: string): Promise<BlogPost[]> {
               { locale, sitemapStale: staleFallback.length },
               "blog: serving stale metadata disk cache as fallback"
             );
-            sitemapPosts = staleFallback;
+            sitemapPosts = staleFallback.map((p) => ({ ...p, stale: true }));
           }
         }
       }
@@ -708,7 +709,7 @@ async function doFetchFeed(locale: string): Promise<BlogPost[]> {
         { locale, sitemapStale: staleFallback.length },
         "blog: serving stale metadata disk cache as fallback"
       );
-      sitemapPosts = staleFallback;
+      sitemapPosts = staleFallback.map((p) => ({ ...p, stale: true }));
     }
   }
 
@@ -722,7 +723,7 @@ async function doFetchFeed(locale: string): Promise<BlogPost[]> {
         { locale, sitemapStale: staleFallback.length },
         "blog: serving stale metadata disk cache as fallback"
       );
-      sitemapPosts = staleFallback;
+      sitemapPosts = staleFallback.map((p) => ({ ...p, stale: true }));
     }
   }
 
