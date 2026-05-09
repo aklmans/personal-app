@@ -1020,6 +1020,10 @@ export default function PostDetailScreen() {
     };
   }, [copyToastAnim]);
 
+  useEffect(() => {
+    progressAnim.setValue(0);
+  }, [slug, progressAnim]);
+
   const handleShare = useCallback(async () => {
     if (!post) return;
     const url = post.link;
