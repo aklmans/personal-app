@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import * as WebBrowser from "expo-web-browser";
-import React, { useCallback } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   Image,
   Platform,
@@ -67,6 +67,8 @@ const THEME_OPTIONS: { value: ThemePreference; label: string; labelZh: string; i
   { value: "system", label: "System", labelZh: "跟随系统", icon: "smartphone" },
 ];
 
+type SortOrder = "newest" | "oldest";
+
 export default function MoreScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -77,6 +79,35 @@ export default function MoreScreen() {
   const { history, clearHistory } = useHistory();
   const { optedIn, permissionStatus, isLoading, enable, disable } = useNotifications();
   const topPad = Platform.OS === "web" ? Math.max(insets.top, 67) : insets.top;
+
+  const [bookmarkSort, setBookmarkSort] = useState<SortOrder>("newest");
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+
+  const bookmarkCategories = useMemo(() => {
+    const seen = new Set<string>();
+    const cats: string[] = [];
+    for (const b of bookmarks) {
+      for (const c of b.categories) {
+        if (!seen.has(c)) {
+          seen.add(c);
+          cats.push(c);
+        }
+      }
+    }
+    return cats;
+  }, [bookmarks]);
+
+  const displayedBookmarks = useMemo(() => {
+    let list = activeCategory
+      ? bookmarks.filter((b) => b.categories.includes(activeCategory))
+      : bookmarks;
+    list = [...list].sort((a, b) => {
+      const ta = a.pubDate ? new Date(a.pubDate).getTime() : 0;
+      const tb = b.pubDate ? new Date(b.pubDate).getTime() : 0;
+      return bookmarkSort === "newest" ? tb - ta : ta - tb;
+    });
+    return list;
+  }, [bookmarks, activeCategory, bookmarkSort]);
 
   const openUrl = useCallback(async (url: string) => {
     await WebBrowser.openBrowserAsync(url);
@@ -173,14 +204,126 @@ export default function MoreScreen() {
       </View>
 
       <View style={[styles.section, { marginTop: 24 }]}>
-        <Text
-          style={[
-            styles.sectionLabel,
-            { color: colors.mutedForeground, fontFamily: fonts.sans.semiBold },
-          ]}
-        >
-          {isZh ? "书签" : "BOOKMARKS"}
-        </Text>
+        <View style={styles.sectionHeader}>
+          <Text
+            style={[
+              styles.sectionLabel,
+              { color: colors.mutedForeground, fontFamily: fonts.sans.semiBold },
+            ]}
+          >
+            {isZh ? "书签" : "BOOKMARKS"}
+          </Text>
+          {bookmarks.length > 0 && (
+            <View style={styles.sortToggle}>
+              <Pressable
+                onPress={() => setBookmarkSort("newest")}
+                style={[
+                  styles.sortBtn,
+                  {
+                    backgroundColor: bookmarkSort === "newest" ? colors.primary : colors.secondary,
+                    borderColor: bookmarkSort === "newest" ? colors.primary : colors.border,
+                  },
+                ]}
+                accessibilityLabel={isZh ? "最新" : "Newest first"}
+                accessibilityRole="button"
+              >
+                <Text
+                  style={[
+                    styles.sortBtnLabel,
+                    {
+                      color: bookmarkSort === "newest" ? "#ffffff" : colors.mutedForeground,
+                      fontFamily: fonts.sans.medium,
+                    },
+                  ]}
+                >
+                  {isZh ? "最新" : "Newest"}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setBookmarkSort("oldest")}
+                style={[
+                  styles.sortBtn,
+                  {
+                    backgroundColor: bookmarkSort === "oldest" ? colors.primary : colors.secondary,
+                    borderColor: bookmarkSort === "oldest" ? colors.primary : colors.border,
+                  },
+                ]}
+                accessibilityLabel={isZh ? "最早" : "Oldest first"}
+                accessibilityRole="button"
+              >
+                <Text
+                  style={[
+                    styles.sortBtnLabel,
+                    {
+                      color: bookmarkSort === "oldest" ? "#ffffff" : colors.mutedForeground,
+                      fontFamily: fonts.sans.medium,
+                    },
+                  ]}
+                >
+                  {isZh ? "最早" : "Oldest"}
+                </Text>
+              </Pressable>
+            </View>
+          )}
+        </View>
+
+        {bookmarks.length > 0 && bookmarkCategories.length > 0 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.chipScroll}
+            contentContainerStyle={styles.chipRow}
+          >
+            <Pressable
+              onPress={() => setActiveCategory(null)}
+              style={[
+                styles.chip,
+                {
+                  backgroundColor: activeCategory === null ? colors.primary : colors.secondary,
+                  borderColor: activeCategory === null ? colors.primary : colors.border,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.chipLabel,
+                  {
+                    color: activeCategory === null ? "#ffffff" : colors.mutedForeground,
+                    fontFamily: fonts.sans.medium,
+                  },
+                ]}
+              >
+                {isZh ? "全部" : "All"}
+              </Text>
+            </Pressable>
+            {bookmarkCategories.map((cat) => (
+              <Pressable
+                key={cat}
+                onPress={() => setActiveCategory(activeCategory === cat ? null : cat)}
+                style={[
+                  styles.chip,
+                  {
+                    backgroundColor: activeCategory === cat ? colors.primary : colors.secondary,
+                    borderColor: activeCategory === cat ? colors.primary : colors.border,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.chipLabel,
+                    {
+                      color: activeCategory === cat ? "#ffffff" : colors.mutedForeground,
+                      fontFamily: fonts.sans.medium,
+                    },
+                  ]}
+                >
+                  {cat}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        )}
+
         {bookmarks.length === 0 ? (
           <View style={[styles.emptyBookmarks, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Feather name="bookmark" size={22} color={colors.mutedForeground} />
@@ -188,10 +331,17 @@ export default function MoreScreen() {
               {isZh ? "尚无书签。在文章页面点击书签图标即可保存。" : "No bookmarks yet. Tap the bookmark icon on any article to save it."}
             </Text>
           </View>
+        ) : displayedBookmarks.length === 0 ? (
+          <View style={[styles.emptyBookmarks, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Feather name="filter" size={22} color={colors.mutedForeground} />
+            <Text style={[styles.emptyBookmarksText, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}>
+              {isZh ? "此分类下暂无书签。" : "No bookmarks in this category."}
+            </Text>
+          </View>
         ) : (
-          bookmarks.map((post) => (
+          displayedBookmarks.map((post) => (
             <Pressable
-              key={post.slug}
+              key={`${post.locale}:${post.slug}`}
               onPress={() =>
                 router.push({
                   pathname: "/post/[slug]",
@@ -721,6 +871,36 @@ const styles = StyleSheet.create({
     marginBottom: 3,
   },
   bookmarkMeta: {
+    fontSize: 12,
+  },
+  sortToggle: {
+    flexDirection: "row",
+    gap: 4,
+  },
+  sortBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  sortBtnLabel: {
+    fontSize: 12,
+  },
+  chipScroll: {
+    marginBottom: 8,
+  },
+  chipRow: {
+    flexDirection: "row",
+    gap: 6,
+    paddingBottom: 2,
+  },
+  chip: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  chipLabel: {
     fontSize: 12,
   },
   historyMeta: {
