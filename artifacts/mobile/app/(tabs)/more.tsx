@@ -79,7 +79,7 @@ export default function MoreScreen() {
   const router = useRouter();
   const { bookmarks, toggleBookmark } = useBookmarks();
   const { history, clearHistory } = useHistory();
-  const { optedIn, permissionStatus, isLoading, enable, disable, notifCategories, setNotifCategories, availableCategories, refreshAvailableCategories } = useNotifications();
+  const { optedIn, permissionStatus, isLoading, enable, disable, notifCategories, setNotifCategories, availableCategories, refreshAvailableCategories, clearBadge } = useNotifications();
   const topPad = Platform.OS === "web" ? Math.max(insets.top, 67) : insets.top;
 
   const [bookmarkSort, setBookmarkSort] = useState<SortOrder>("newest");
@@ -133,8 +133,9 @@ export default function MoreScreen() {
   useFocusEffect(
     useCallback(() => {
       refreshAvailableCategories();
+      clearBadge();
       return () => { setSearchQuery(""); };
-    }, [refreshAvailableCategories])
+    }, [refreshAvailableCategories, clearBadge])
   );
 
   const allKnownCategories = useMemo(() => {

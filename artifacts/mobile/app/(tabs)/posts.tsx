@@ -2,7 +2,7 @@ import {
   useListBlogCategories,
   queryOpts,
 } from "@workspace/api-client-react";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
@@ -22,6 +22,7 @@ import { PostCard } from "@/components/PostCard";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { fonts } from "@/constants/fonts";
 import { useLanguage } from "@/context/LanguageContext";
+import { useNotifications } from "@/context/NotificationsContext";
 import { usePaginatedPosts } from "@/hooks/usePaginatedPosts";
 import { useColors } from "@/hooks/useColors";
 
@@ -30,8 +31,15 @@ export default function PostsScreen() {
   const router = useRouter();
   const { locale, isZh } = useLanguage();
   const insets = useSafeAreaInsets();
+  const { clearBadge } = useNotifications();
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>(
     undefined
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      clearBadge();
+    }, [clearBadge])
   );
 
   const {

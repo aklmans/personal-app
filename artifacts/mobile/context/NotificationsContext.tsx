@@ -39,6 +39,7 @@ interface NotificationsContextValue {
   setNotifCategories: (cats: string[]) => Promise<void>;
   availableCategories: string[];
   refreshAvailableCategories: () => void;
+  clearBadge: () => void;
 }
 
 const NotificationsContext = createContext<NotificationsContextValue>({
@@ -51,6 +52,7 @@ const NotificationsContext = createContext<NotificationsContextValue>({
   setNotifCategories: async () => {},
   availableCategories: [],
   refreshAvailableCategories: () => {},
+  clearBadge: () => {},
 });
 
 async function ensureAndroidChannel(): Promise<void> {
@@ -297,6 +299,10 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     }
   }, [optedIn, locale]);
 
+  const clearBadgeCallback = useCallback(() => {
+    clearBadge(pushTokenRef.current).catch(() => {});
+  }, []);
+
   const disable = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -316,7 +322,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
 
   return (
     <NotificationsContext.Provider
-      value={{ optedIn, permissionStatus, isLoading, enable, disable, notifCategories, setNotifCategories, availableCategories, refreshAvailableCategories: fetchAvailableCategories }}
+      value={{ optedIn, permissionStatus, isLoading, enable, disable, notifCategories, setNotifCategories, availableCategories, refreshAvailableCategories: fetchAvailableCategories, clearBadge: clearBadgeCallback }}
     >
       {children}
     </NotificationsContext.Provider>
