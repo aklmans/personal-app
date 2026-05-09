@@ -983,6 +983,7 @@ export default function PostDetailScreen() {
   const bannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bannerSwipeDy = useRef(new Animated.Value(0)).current;
   const [showSwipeHint, setShowSwipeHint] = useState(false);
+  const swipeHintAnim = useRef(new Animated.Value(0)).current;
   const bannerPanResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gs) =>
@@ -1460,16 +1461,21 @@ export default function PostDetailScreen() {
   dismissBannerRef.current = dismissBanner;
 
   const markHintSeen = useCallback(() => {
-    setShowSwipeHint(false);
+    Animated.timing(swipeHintAnim, { toValue: 0, duration: 250, useNativeDriver: true }).start(() => {
+      setShowSwipeHint(false);
+    });
     AsyncStorage.setItem(SWIPE_HINT_KEY, "1").catch(() => {});
-  }, []);
+  }, [swipeHintAnim]);
   markHintSeenRef.current = markHintSeen;
 
   useEffect(() => {
     AsyncStorage.getItem(SWIPE_HINT_KEY).then(val => {
-      if (val === null) setShowSwipeHint(true);
+      if (val === null) {
+        setShowSwipeHint(true);
+        swipeHintAnim.setValue(1);
+      }
     }).catch(() => {});
-  }, []);
+  }, [swipeHintAnim]);
 
   const handleResumeTap = useCallback(() => {
     if (resumeBannerPos === null) return;
@@ -1820,7 +1826,7 @@ export default function PostDetailScreen() {
             </Pressable>
           </View>
           {showSwipeHint && (
-            <View style={[styles.swipeHintHandle, { backgroundColor: `${themeColors.text}30` }]} />
+            <Animated.View style={[styles.swipeHintHandle, { backgroundColor: `${themeColors.text}30`, opacity: swipeHintAnim }]} />
           )}
         </Animated.View>
       )}
