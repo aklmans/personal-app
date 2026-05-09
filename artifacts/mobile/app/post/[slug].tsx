@@ -928,6 +928,7 @@ function buildHtml(
 <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
 <script>${highlightScript}</script>
 <script>(function(){var selTimer;document.addEventListener('selectionchange',function(){clearTimeout(selTimer);selTimer=setTimeout(function(){var sel=window.getSelection?window.getSelection().toString().trim():'';window.parent.postMessage(JSON.stringify({t:'selection',text:sel}),'*');},300);});})()</script>
+<script>(function(){window.addEventListener('message',function(e){try{var d=JSON.parse(e.data);}catch(err){return;}if(d.t!=='highlight')return;var sel=window.getSelection();if(!sel||sel.rangeCount===0)return;var range=sel.getRangeAt(0);try{var mark=document.createElement('span');mark.style.cssText='background:rgba(218,119,86,0.35);border-radius:2px;transition:background 1.5s ease-out';range.surroundContents(mark);sel.removeAllRanges();setTimeout(function(){mark.style.background='transparent';setTimeout(function(){var p=mark.parentNode;if(p){while(mark.firstChild)p.insertBefore(mark.firstChild,mark);p.removeChild(mark);}},1500);},50);}catch(err){document.body.style.transition='background 0.3s ease';document.body.style.background='rgba(218,119,86,0.12)';setTimeout(function(){document.body.style.background='';},700);}});})()</script>
 </body>
 </html>`;
 }
@@ -1272,6 +1273,7 @@ export default function PostDetailScreen() {
             const message = `"${msg.text}"\n\n— ${post.title}\n${post.link}`;
             navigator.clipboard.writeText(message).then(() => {
               showCopyToast(isZh ? "引用已复制" : "Quote copied");
+              iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ t: "highlight" }), "*");
             }).catch(() => {});
           }
         }
