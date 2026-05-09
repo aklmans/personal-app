@@ -1108,7 +1108,9 @@ export default function PostDetailScreen() {
                 <Feather
                   name="bookmark"
                   size={20}
-                  color={bookmarked ? colors.primary : themeColors.text}
+                  color={bookmarked
+                    ? (colorTheme === "default" ? colors.primary : themeColors.text)
+                    : themeIconMuted}
                 />
               </Pressable>
             )}
