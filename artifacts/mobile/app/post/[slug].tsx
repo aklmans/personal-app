@@ -1377,6 +1377,10 @@ export default function PostDetailScreen() {
   const dismissBanner = useCallback(() => {
     if (isDismissingBannerRef.current) return;
     isDismissingBannerRef.current = true;
+    if (bannerTimerRef.current) {
+      clearTimeout(bannerTimerRef.current);
+      bannerTimerRef.current = null;
+    }
     Animated.timing(bannerAnim, {
       toValue: 0,
       duration: 220,
