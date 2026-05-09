@@ -1,8 +1,0 @@
-uploads = []
-outputs = []
-
-[[generated]]
-id = "5pKjoyz93eF1pYY_Gylqo"
-uri = "file://artifacts/mobile/assets/images/icon.png"
-type = "image"
-title = "aklman blog app icon"
