@@ -561,6 +561,16 @@ function buildInjectedJS(
   window.addEventListener('scroll', send, { passive: true });
   window.addEventListener('load', send);
   send();
+  var selTimer;
+  document.addEventListener('selectionchange', function() {
+    clearTimeout(selTimer);
+    selTimer = setTimeout(function() {
+      var sel = window.getSelection ? window.getSelection().toString().trim() : '';
+      if (window.ReactNativeWebView) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({ t: 'selection', text: sel }));
+      }
+    }, 300);
+  });
 })();
 true;`;
 }
@@ -933,6 +943,7 @@ export default function PostDetailScreen() {
   } = useReadingPrefs();
   const [sheetVisible, setSheetVisible] = useState(false);
   const [resumeBannerPos, setResumeBannerPos] = useState<number | null>(null);
+  const [selectedQuote, setSelectedQuote] = useState("");
   const { isBookmarked, toggleBookmark } = useBookmarks();
   const { recordVisit } = useHistory();
 
@@ -956,6 +967,19 @@ export default function PostDetailScreen() {
   );
 
   const post = data as PostWithContent | undefined;
+
+  const handleShareQuote = useCallback(async () => {
+    if (!post || !selectedQuote) return;
+    const message = `"${selectedQuote}"\n\n— ${post.title}\n${post.link}`;
+    try {
+      await Share.share(
+        Platform.OS === "ios"
+          ? { message, url: post.link }
+          : { message }
+      );
+    } catch {}
+    setSelectedQuote("");
+  }, [post, selectedQuote]);
 
   const handleShare = useCallback(async () => {
     if (!post) return;
@@ -1211,6 +1235,10 @@ export default function PostDetailScreen() {
     (event: { nativeEvent: { data: string } }) => {
       try {
         const msg = JSON.parse(event.nativeEvent.data);
+        if (msg.t === "selection" && typeof msg.text === "string") {
+          setSelectedQuote(msg.text);
+          return;
+        }
         if (msg.t === "scroll" && typeof msg.p === "number") {
           Animated.timing(progressAnim, {
             toValue: msg.p,
@@ -1505,6 +1533,45 @@ export default function PostDetailScreen() {
         </View>
       )}
 
+      {Platform.OS !== "web" && selectedQuote.length > 0 && (
+        <View
+          style={[
+            styles.shareQuoteBar,
+            { backgroundColor: colors.card, borderColor: colors.border },
+          ]}
+        >
+          <Pressable
+            onPress={handleShareQuote}
+            accessibilityRole="button"
+            accessibilityLabel={isZh ? "分享引用" : "Share quote"}
+            style={({ pressed }) => [
+              styles.shareQuoteBtn,
+              { backgroundColor: pressed ? "#c05540" : colors.primary },
+            ]}
+          >
+            <Feather name="share-2" size={13} color="#ffffff" />
+            <Text style={[styles.shareQuoteBtnText, { fontFamily: fonts.sans.semiBold }]}>
+              {isZh ? "分享引用" : "Share quote"}
+            </Text>
+          </Pressable>
+          <Text
+            style={[styles.shareQuotePreview, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}
+            numberOfLines={1}
+          >
+            {selectedQuote}
+          </Text>
+          <Pressable
+            onPress={() => setSelectedQuote("")}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityRole="button"
+            accessibilityLabel={isZh ? "取消" : "Dismiss"}
+            style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
+          >
+            <Feather name="x" size={16} color={colors.mutedForeground} />
+          </Pressable>
+        </View>
+      )}
+
       {resumeBannerPos !== null && (
         <View
           style={[
@@ -1649,5 +1716,33 @@ const styles = StyleSheet.create({
     flex: 1,
     color: "#ffffff",
     fontSize: 13,
+  },
+  shareQuoteBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginHorizontal: 16,
+    marginBottom: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  shareQuoteBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 7,
+  },
+  shareQuoteBtnText: {
+    color: "#ffffff",
+    fontSize: 13,
+  },
+  shareQuotePreview: {
+    flex: 1,
+    fontSize: 12,
+    fontStyle: "italic",
   },
 });
