@@ -576,23 +576,6 @@ async function doFetchFeed(locale: string): Promise<BlogPost[]> {
     }
   } catch (err) {
     logger.warn({ locale, err }, "blog: sitemap scraping failed");
-    const rssLinks = new Set(rssPosts.map((p) => p.link.replace(/\/+$/, "")));
-    const staleFallback: BlogPost[] = [];
-    for (const [_url, entry] of _diskMetaCache.entries()) {
-      if (
-        entry.post.locale === locale &&
-        !rssLinks.has(entry.post.link.replace(/\/+$/, ""))
-      ) {
-        staleFallback.push(entry.post);
-      }
-    }
-    if (staleFallback.length > 0) {
-      logger.warn(
-        { locale, sitemapStale: staleFallback.length },
-        "blog: serving stale metadata disk cache as fallback"
-      );
-      sitemapPosts = staleFallback;
-    }
   }
 
   const allPosts = [...rssPosts, ...sitemapPosts].sort((a, b) => {
@@ -601,8 +584,35 @@ async function doFetchFeed(locale: string): Promise<BlogPost[]> {
     return db - da;
   });
 
+  // Last-resort fallback: if no live data arrived from either source, serve any
+  // metadata entries still held in _diskMetaCache for this locale — including
+  // entries whose savedAt has passed METADATA_DISK_TTL — so readers see stale
+  // posts rather than a blank list during extended feed outages.
+  let effectivePosts = allPosts;
+  if (allPosts.length === 0) {
+    const staleFallback: BlogPost[] = [];
+    const seen = new Set<string>();
+    for (const [url] of _diskMetaCache.entries()) {
+      const post = getMetadataFromDiskCache(url, { allowExpired: true });
+      if (post && post.locale === locale) {
+        const normalized = post.link.replace(/\/+$/, "");
+        if (!seen.has(normalized)) {
+          seen.add(normalized);
+          staleFallback.push(post);
+        }
+      }
+    }
+    if (staleFallback.length > 0) {
+      logger.warn(
+        { locale, sitemapStale: staleFallback.length },
+        "blog: serving stale metadata disk cache as fallback"
+      );
+      effectivePosts = staleFallback;
+    }
+  }
+
   const now = Date.now();
-  const posts = allPosts.length > 0 ? allPosts : (cache[locale]?.posts ?? []);
+  const posts = effectivePosts.length > 0 ? effectivePosts : (cache[locale]?.posts ?? []);
   const entry: CacheEntry = { posts, timestamp: now };
   cache[locale] = entry;
   saveDiskCache(locale, entry);
