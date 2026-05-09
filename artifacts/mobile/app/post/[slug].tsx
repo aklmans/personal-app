@@ -1,6 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { useGetBlogPost, queryOpts } from "@workspace/api-client-react";
 import type { RelatedPost } from "@workspace/api-client-react";
+import * as Clipboard from "expo-clipboard";
 import * as WebBrowser from "expo-web-browser";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -1011,28 +1012,6 @@ export default function PostDetailScreen() {
 
   const post = data as PostWithContent | undefined;
 
-  const handleShareQuote = useCallback(async () => {
-    if (!post || !selectedQuote) return;
-    const message = `"${selectedQuote}"\n\n— ${post.title}\n${post.link}`;
-    try {
-      await Share.share(
-        Platform.OS === "ios"
-          ? { message, url: post.link }
-          : { message }
-      );
-    } catch {}
-    setSelectedQuote("");
-  }, [post, selectedQuote]);
-
-  const themeColors = useMemo(
-    () => resolveThemeColors(colorTheme, colors.background, colors.text),
-    [colorTheme, colors.background, colors.text]
-  );
-
-  const themeIconMuted = colorTheme === "default"
-    ? colors.mutedForeground
-    : `${themeColors.text}70`;
-
   const showCopyToast = useCallback(() => {
     if (copyToastTimerRef.current) clearTimeout(copyToastTimerRef.current);
     copyToastAnim.stopAnimation();
@@ -1051,6 +1030,33 @@ export default function PostDetailScreen() {
       copyToastAnim.stopAnimation();
     };
   }, [copyToastAnim]);
+
+  const handleShareQuote = useCallback(async () => {
+    if (!post || !selectedQuote) return;
+    const message = `"${selectedQuote}"\n\n— ${post.title}\n${post.link}`;
+    try {
+      await Share.share(
+        Platform.OS === "ios"
+          ? { message, url: post.link }
+          : { message }
+      );
+    } catch {
+      try {
+        await Clipboard.setStringAsync(message);
+        showCopyToast();
+      } catch {}
+    }
+    setSelectedQuote("");
+  }, [post, selectedQuote, showCopyToast]);
+
+  const themeColors = useMemo(
+    () => resolveThemeColors(colorTheme, colors.background, colors.text),
+    [colorTheme, colors.background, colors.text]
+  );
+
+  const themeIconMuted = colorTheme === "default"
+    ? colors.mutedForeground
+    : `${themeColors.text}70`;
 
   useEffect(() => {
     progressAnim.setValue(0);

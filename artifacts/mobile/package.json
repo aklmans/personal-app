@@ -57,6 +57,7 @@
   },
   "dependencies": {
     "@expo-google-fonts/lora": "^0.4.2",
+    "expo-clipboard": "^55.0.13",
     "expo-notifications": "~0.32.17",
     "react-native-webview": "^13.16.1"
   }
