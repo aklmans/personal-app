@@ -1,6 +1,7 @@
 import { Feather } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as WebBrowser from "expo-web-browser";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Image,
   Platform,
@@ -84,6 +85,19 @@ export default function MoreScreen() {
   const [bookmarkSort, setBookmarkSort] = useState<SortOrder>("newest");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+
+  useEffect(() => {
+    AsyncStorage.getItem("@bookmark_sort_v1")
+      .then((val) => {
+        if (val === "newest" || val === "oldest") setBookmarkSort(val);
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleSetBookmarkSort = useCallback((sort: SortOrder) => {
+    setBookmarkSort(sort);
+    AsyncStorage.setItem("@bookmark_sort_v1", sort).catch(() => {});
+  }, []);
 
   const bookmarkCategories = useMemo(() => {
     const seen = new Set<string>();
@@ -252,7 +266,7 @@ export default function MoreScreen() {
           {bookmarks.length > 0 && (
             <View style={styles.sortToggle}>
               <Pressable
-                onPress={() => setBookmarkSort("newest")}
+                onPress={() => handleSetBookmarkSort("newest")}
                 style={[
                   styles.sortBtn,
                   {
@@ -276,7 +290,7 @@ export default function MoreScreen() {
                 </Text>
               </Pressable>
               <Pressable
-                onPress={() => setBookmarkSort("oldest")}
+                onPress={() => handleSetBookmarkSort("oldest")}
                 style={[
                   styles.sortBtn,
                   {
