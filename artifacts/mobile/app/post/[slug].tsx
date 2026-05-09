@@ -1482,11 +1482,14 @@ export default function PostDetailScreen() {
         <>
           <View style={{ height: 3, backgroundColor: colors.border, overflow: "hidden" }}>
             <Animated.View
-              style={{
-                height: "100%",
-                backgroundColor: colors.primary,
-                width: progressAnim.interpolate({ inputRange: [0, 1], outputRange: ["0%", "100%"] }),
-              }}
+              style={[
+                {
+                  height: "100%",
+                  backgroundColor: colors.primary,
+                  width: progressAnim.interpolate({ inputRange: [0, 1], outputRange: ["0%", "100%"] }),
+                },
+                { transition: "width 80ms linear" } as unknown as React.CSSProperties,
+              ]}
             />
           </View>
           {hydrated ? (
