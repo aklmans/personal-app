@@ -208,8 +208,11 @@ function evictOldestContentIfNeeded(): void {
   for (const [evictUrl] of toEvict) {
     contentDiskTs.delete(evictUrl);
     contentCache.delete(evictUrl);
-    fs.unlink(contentDiskCachePath(evictUrl), () => {});
+    fs.unlink(contentDiskCachePath(evictUrl), (err) => {
+      if (err) logger.warn({ url: evictUrl, err }, "blog: content cache LRU eviction unlink failed");
+    });
   }
+  logger.warn({ evicted: toEvict.length, cap: CONTENT_DISK_MAX_ENTRIES }, "blog: content cache LRU eviction triggered");
 }
 
 function saveContentToDisk(url: string, html: string, ts: number): void {
