@@ -940,6 +940,7 @@ export default function PostDetailScreen() {
 
   const progressAnim = useRef(new Animated.Value(0)).current;
   const webViewRef = useRef<WebView>(null);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const recordedKeyRef = useRef<string | null>(null);
   const scrollSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const restoredKeyRef = useRef<string | null>(null);
@@ -1140,7 +1141,7 @@ export default function PostDetailScreen() {
   );
 
   useEffect(() => {
-    if (!scrollStorageKey || Platform.OS === "web") return;
+    if (!scrollStorageKey) return;
     let cancelled = false;
     setResumeBannerPos(null);
     loadScrollPos(scrollStorageKey).then((pos) => {
@@ -1241,11 +1242,70 @@ export default function PostDetailScreen() {
     setTimeout(() => { isRestoringRef.current = false; }, delay + 1200);
   }, []);
 
+  const webScrollToPos = useCallback((position: number, delay = 0) => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+    const doScroll = () => {
+      const cw = iframe.contentWindow;
+      if (!cw) return;
+      const doc = cw.document.documentElement;
+      const total = doc.scrollHeight - doc.clientHeight;
+      if (total > 0) cw.scrollTo({ top: Math.round(position * total) });
+    };
+    if (delay > 0) setTimeout(doScroll, delay);
+    else doScroll();
+  }, []);
+
   const handleResumeTap = useCallback(() => {
-    if (Platform.OS === "web" || !webViewRef.current || resumeBannerPos === null) return;
-    injectScrollToPos(resumeBannerPos);
+    if (resumeBannerPos === null) return;
+    if (Platform.OS === "web") {
+      webScrollToPos(resumeBannerPos);
+    } else {
+      if (!webViewRef.current) return;
+      injectScrollToPos(resumeBannerPos);
+    }
     setResumeBannerPos(null);
-  }, [resumeBannerPos, injectScrollToPos]);
+  }, [resumeBannerPos, injectScrollToPos, webScrollToPos]);
+
+  const onIframeLoad = useCallback(() => {
+    const iframe = iframeRef.current;
+    if (!iframe?.contentWindow) return;
+    const cw = iframe.contentWindow;
+    if (scrollStorageKey && restoredKeyRef.current !== scrollStorageKey) {
+      restoredKeyRef.current = scrollStorageKey;
+      loadScrollPos(scrollStorageKey).then((position) => {
+        if (position == null || position <= 0.05) return;
+        webScrollToPos(position, 400);
+      });
+    }
+    const handleScroll = () => {
+      const doc = cw.document.documentElement;
+      const total = doc.scrollHeight - doc.clientHeight;
+      if (total <= 0) return;
+      const p = Math.min(1, Math.max(0, doc.scrollTop / total));
+      lastScrollPosRef.current = p;
+      Animated.timing(progressAnim, { toValue: p, duration: 80, useNativeDriver: false }).start();
+      if (!scrollStorageKey) return;
+      if (p >= 0.95) {
+        if (scrollSaveTimerRef.current) clearTimeout(scrollSaveTimerRef.current);
+        scrollSaveTimerRef.current = null;
+        clearScrollPos(scrollStorageKey);
+        setResumeBannerPos(null);
+        return;
+      }
+      if (p > 0.05) {
+        if (scrollSaveTimerRef.current) clearTimeout(scrollSaveTimerRef.current);
+        scrollSaveTimerRef.current = setTimeout(() => {
+          saveScrollPos(scrollStorageKey, p);
+        }, 500);
+      }
+      setResumeBannerPos((prev) => {
+        if (prev !== null && p > prev + 0.02) return null;
+        return prev;
+      });
+    };
+    cw.addEventListener("scroll", handleScroll, { passive: true });
+  }, [scrollStorageKey, webScrollToPos, progressAnim]);
 
   const restoreScrollPosition = useCallback(async () => {
     if (Platform.OS === "web" || !webViewRef.current || !scrollStorageKey) return;
@@ -1295,7 +1355,9 @@ export default function PostDetailScreen() {
       {Platform.OS === "web" ? (
         hydrated ? (
           <iframe
+            ref={iframeRef}
             srcDoc={webHtmlContent}
+            onLoad={onIframeLoad}
             style={{
               flex: 1,
               border: "none",
@@ -1428,7 +1490,7 @@ export default function PostDetailScreen() {
         </View>
       )}
 
-      {resumeBannerPos !== null && Platform.OS !== "web" && (
+      {resumeBannerPos !== null && (
         <View
           style={[
             styles.resumeBanner,
