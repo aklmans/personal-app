@@ -37,6 +37,7 @@ interface NotificationsContextValue {
   disable: () => Promise<void>;
   notifCategories: string[];
   setNotifCategories: (cats: string[]) => Promise<void>;
+  availableCategories: string[];
 }
 
 const NotificationsContext = createContext<NotificationsContextValue>({
@@ -47,6 +48,7 @@ const NotificationsContext = createContext<NotificationsContextValue>({
   disable: async () => {},
   notifCategories: [],
   setNotifCategories: async () => {},
+  availableCategories: [],
 });
 
 async function ensureAndroidChannel(): Promise<void> {
@@ -113,10 +115,22 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   const [permissionStatus, setPermissionStatus] = useState<"undetermined" | "granted" | "denied">("undetermined");
   const [isLoading, setIsLoading] = useState(false);
   const [notifCategories, setNotifCategoriesState] = useState<string[]>([]);
+  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
   const router = useRouter();
   const { locale } = useLanguage();
   const notificationResponseListener = useRef<Notifications.EventSubscription | null>(null);
   const coldStartHandled = useRef(false);
+
+  useEffect(() => {
+    fetch(`${API_BASE}/notifications/categories`)
+      .then((r) => r.json())
+      .then((data: unknown) => {
+        if (data && typeof data === "object" && "categories" in data && Array.isArray((data as { categories: unknown }).categories)) {
+          setAvailableCategories((data as { categories: string[] }).categories);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     AsyncStorage.multiGet([STORAGE_KEY, STORAGE_CATEGORIES_KEY, STORAGE_TOKEN_KEY])
@@ -253,7 +267,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
 
   return (
     <NotificationsContext.Provider
-      value={{ optedIn, permissionStatus, isLoading, enable, disable, notifCategories, setNotifCategories }}
+      value={{ optedIn, permissionStatus, isLoading, enable, disable, notifCategories, setNotifCategories, availableCategories }}
     >
       {children}
     </NotificationsContext.Provider>

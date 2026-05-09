@@ -24,6 +24,7 @@ type TokenRecord = { token: string; locale: string; categories: string[] };
 const registeredTokens = new Map<string, { locale: string; categories: string[] }>();
 
 const knownPostSlugs = new Set<string>();
+const knownCategories = new Set<string>();
 let initialized = false;
 
 let _sitemapUrlsCache: { urls: string[]; ts: number } | null = null;
@@ -230,6 +231,7 @@ async function pollAndNotify(): Promise<void> {
     }
 
     for (const item of allSlugs.values()) {
+      for (const c of item.categories) knownCategories.add(c);
       const key = `${locale}:${item.slug}`;
       if (!knownPostSlugs.has(key)) {
         knownPostSlugs.add(key);
@@ -292,6 +294,10 @@ function isValidExpoToken(token: string): boolean {
 }
 
 const VALID_LOCALES = new Set(Object.keys(RSS_FEEDS));
+
+router.get("/categories", (_req, res) => {
+  res.json({ categories: Array.from(knownCategories).sort() });
+});
 
 router.post("/register", async (req, res) => {
   const { token, locale, categories } = req.body as { token?: string; locale?: string; categories?: unknown };

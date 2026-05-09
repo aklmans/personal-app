@@ -77,7 +77,7 @@ export default function MoreScreen() {
   const router = useRouter();
   const { bookmarks, toggleBookmark } = useBookmarks();
   const { history, clearHistory } = useHistory();
-  const { optedIn, permissionStatus, isLoading, enable, disable, notifCategories, setNotifCategories } = useNotifications();
+  const { optedIn, permissionStatus, isLoading, enable, disable, notifCategories, setNotifCategories, availableCategories } = useNotifications();
   const topPad = Platform.OS === "web" ? Math.max(insets.top, 67) : insets.top;
 
   const [bookmarkSort, setBookmarkSort] = useState<SortOrder>("newest");
@@ -111,8 +111,8 @@ export default function MoreScreen() {
   }, [bookmarkCategories, activeCategory]);
 
   const allKnownCategories = useMemo(() => {
-    const seen = new Set<string>();
-    const cats: string[] = [];
+    const seen = new Set<string>(availableCategories);
+    const cats: string[] = [...availableCategories];
     for (const entry of history) {
       for (const c of entry.categories ?? []) {
         if (!seen.has(c)) { seen.add(c); cats.push(c); }
@@ -124,7 +124,7 @@ export default function MoreScreen() {
       }
     }
     return cats;
-  }, [history, bookmarks]);
+  }, [availableCategories, history, bookmarks]);
 
   const readingStats = useMemo(() => {
     const totalArticles = history.length;
