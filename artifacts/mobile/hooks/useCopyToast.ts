@@ -6,16 +6,17 @@
  * this hook instead of duplicating the same boilerplate.
  *
  * Usage:
- *   const { showCopyToast, copyToastVisible, copyToastAnim } = useCopyToast();
+ *   const { showCopyToast, copyToastVisible, copyToastAnim, copyToastMessage } = useCopyToast();
  *
- *   // Trigger the toast after a successful copy:
+ *   // Trigger the toast after a successful copy (optionally pass a label):
  *   await Clipboard.setStringAsync(url);
- *   showCopyToast();
+ *   showCopyToast();               // uses the default message
+ *   showCopyToast("Quote copied"); // uses a custom message
  *
  *   // Render the toast in JSX (see [slug].tsx for a full example):
  *   {copyToastVisible && (
  *     <Animated.View style={[toastStyle, { opacity: copyToastAnim }]}>
- *       <Text>Link copied</Text>
+ *       <Text>{copyToastMessage}</Text>
  *     </Animated.View>
  *   )}
  */
@@ -28,13 +29,15 @@ const TOAST_FADE_MS = 220;
 
 export function useCopyToast(visibleDuration = TOAST_VISIBLE_MS) {
   const [copyToastVisible, setCopyToastVisible] = useState(false);
+  const [copyToastMessage, setCopyToastMessage] = useState("");
   const copyToastAnim = useRef(new Animated.Value(0)).current;
   const copyToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const showCopyToast = useCallback(() => {
+  const showCopyToast = useCallback((message = "") => {
     if (copyToastTimerRef.current) clearTimeout(copyToastTimerRef.current);
     copyToastAnim.stopAnimation();
     copyToastAnim.setValue(1);
+    setCopyToastMessage(message);
     setCopyToastVisible(true);
     copyToastTimerRef.current = setTimeout(() => {
       Animated.timing(copyToastAnim, {
@@ -54,5 +57,5 @@ export function useCopyToast(visibleDuration = TOAST_VISIBLE_MS) {
     };
   }, [copyToastAnim]);
 
-  return { showCopyToast, copyToastVisible, copyToastAnim };
+  return { showCopyToast, copyToastVisible, copyToastAnim, copyToastMessage };
 }

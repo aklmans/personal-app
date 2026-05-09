@@ -956,7 +956,7 @@ export default function PostDetailScreen() {
   const [resumeBannerPos, setResumeBannerPos] = useState<number | null>(null);
   const [selectedQuote, setSelectedQuote] = useState("");
   const [bannerVisible, setBannerVisible] = useState(false);
-  const { showCopyToast, copyToastVisible, copyToastAnim } = useCopyToast();
+  const { showCopyToast, copyToastVisible, copyToastAnim, copyToastMessage } = useCopyToast();
   const { isBookmarked, toggleBookmark } = useBookmarks();
   const { recordVisit } = useHistory();
   const { clearBadge } = useNotifications();
@@ -1067,8 +1067,8 @@ export default function PostDetailScreen() {
     const message = `"${selectedQuote}"\n\n— ${post.title}\n${post.link}`;
     if (Platform.OS === "web") {
       try {
-        await Clipboard.setStringAsync(message);
-        showCopyToast();
+        await navigator.clipboard.writeText(message);
+        showCopyToast(isZh ? "引用已复制" : "Quote copied");
       } catch {}
       setSelectedQuote("");
       return;
@@ -1082,11 +1082,11 @@ export default function PostDetailScreen() {
     } catch {
       try {
         await Clipboard.setStringAsync(message);
-        showCopyToast();
+        showCopyToast(isZh ? "引用已复制" : "Quote copied");
       } catch {}
     }
     setSelectedQuote("");
-  }, [post, selectedQuote, showCopyToast]);
+  }, [post, selectedQuote, showCopyToast, isZh]);
 
   const themeColors = useMemo(
     () => resolveThemeColors(colorTheme, colors.background, colors.text),
@@ -1922,7 +1922,7 @@ export default function PostDetailScreen() {
         >
           <Feather name="check" size={14} color="#ffffff" />
           <Text style={[styles.copyToastText, { fontFamily: fonts.sans.semiBold }]}>
-            {isZh ? "链接已复制" : "Link copied"}
+            {copyToastMessage || (isZh ? "链接已复制" : "Link copied")}
           </Text>
         </Animated.View>
       )}
