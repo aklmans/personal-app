@@ -12,12 +12,16 @@ import type { PostData } from "@/components/PostCard";
 const STORAGE_KEY = "@reading_history_v1";
 const MAX_HISTORY = 50;
 
-function postKey(post: Pick<PostData, "slug" | "locale">): string {
-  return `${post.locale}:${post.slug}`;
+export interface HistoryEntry extends PostData {
+  visitedAt: string;
+}
+
+function entryKey(entry: Pick<PostData, "slug" | "locale">): string {
+  return `${entry.locale}:${entry.slug}`;
 }
 
 interface HistoryContextValue {
-  history: PostData[];
+  history: HistoryEntry[];
   recordVisit: (post: PostData) => void;
   clearHistory: () => void;
   hasRead: (slug: string, locale: string) => boolean;
@@ -31,29 +35,32 @@ const HistoryContext = createContext<HistoryContextValue>({
 });
 
 export function HistoryProvider({ children }: { children: React.ReactNode }) {
-  const [history, setHistory] = useState<PostData[]>([]);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY)
       .then((raw) => {
         if (raw) {
-          const parsed = JSON.parse(raw) as PostData[];
+          const parsed = JSON.parse(raw) as HistoryEntry[];
           if (Array.isArray(parsed)) setHistory(parsed);
         }
       })
       .catch(() => {});
   }, []);
 
-  const persist = useCallback((next: PostData[]) => {
+  const persist = useCallback((next: HistoryEntry[]) => {
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)).catch(() => {});
   }, []);
 
   const recordVisit = useCallback(
     (post: PostData) => {
-      const key = postKey(post);
+      const key = entryKey(post);
       setHistory((prev) => {
-        const filtered = prev.filter((p) => postKey(p) !== key);
-        const next = [post, ...filtered].slice(0, MAX_HISTORY);
+        const filtered = prev.filter((p) => entryKey(p) !== key);
+        const next: HistoryEntry[] = [
+          { ...post, visitedAt: new Date().toISOString() },
+          ...filtered,
+        ].slice(0, MAX_HISTORY);
         persist(next);
         return next;
       });
@@ -68,7 +75,7 @@ export function HistoryProvider({ children }: { children: React.ReactNode }) {
 
   const hasRead = useCallback(
     (slug: string, locale: string) =>
-      history.some((p) => postKey(p) === `${locale}:${slug}`),
+      history.some((p) => entryKey(p) === `${locale}:${slug}`),
     [history]
   );
 

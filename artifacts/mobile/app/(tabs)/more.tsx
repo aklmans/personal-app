@@ -16,11 +16,43 @@ import { useRouter } from "expo-router";
 
 import { fonts } from "@/constants/fonts";
 import { useBookmarks } from "@/context/BookmarksContext";
-import { useHistory } from "@/context/HistoryContext";
+import { useHistory, type HistoryEntry } from "@/context/HistoryContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useNotifications } from "@/context/NotificationsContext";
 import { useTheme, type ThemePreference } from "@/context/ThemeContext";
 import { useColors } from "@/hooks/useColors";
+
+function formatVisitedAt(iso: string): string {
+  const date = new Date(iso);
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterdayStart = new Date(todayStart.getTime() - 86400000);
+  const dateStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  if (dateStart.getTime() === todayStart.getTime()) return "Today";
+  if (dateStart.getTime() === yesterdayStart.getTime()) return "Yesterday";
+  const sameYear = date.getFullYear() === now.getFullYear();
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    ...(sameYear ? {} : { year: "numeric" }),
+  });
+}
+
+function formatVisitedAtZh(iso: string): string {
+  const date = new Date(iso);
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterdayStart = new Date(todayStart.getTime() - 86400000);
+  const dateStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  if (dateStart.getTime() === todayStart.getTime()) return "今天";
+  if (dateStart.getTime() === yesterdayStart.getTime()) return "昨天";
+  const sameYear = date.getFullYear() === now.getFullYear();
+  return date.toLocaleDateString("zh-CN", {
+    month: "long",
+    day: "numeric",
+    ...(sameYear ? {} : { year: "numeric" }),
+  });
+}
 
 interface NavItem {
   icon: keyof typeof Feather.glyphMap;
@@ -245,13 +277,13 @@ export default function MoreScreen() {
             </Text>
           </View>
         ) : (
-          history.slice(0, 10).map((post) => (
+          history.slice(0, 10).map((entry: HistoryEntry) => (
             <Pressable
-              key={post.slug}
+              key={`${entry.locale}:${entry.slug}`}
               onPress={() =>
                 router.push({
                   pathname: "/post/[slug]",
-                  params: { slug: post.slug, locale: post.locale },
+                  params: { slug: entry.slug, locale: entry.locale },
                 })
               }
               style={({ pressed }) => [
@@ -262,9 +294,9 @@ export default function MoreScreen() {
                 },
               ]}
             >
-              {post.coverImage ? (
+              {entry.coverImage ? (
                 <Image
-                  source={{ uri: post.coverImage }}
+                  source={{ uri: entry.coverImage }}
                   style={[styles.bookmarkThumb, { backgroundColor: colors.muted }]}
                   resizeMode="cover"
                 />
@@ -278,13 +310,21 @@ export default function MoreScreen() {
                   style={[styles.bookmarkTitle, { color: colors.text, fontFamily: fonts.serif.semiBold }]}
                   numberOfLines={2}
                 >
-                  {post.title}
+                  {entry.title}
                 </Text>
-                {post.categories.length > 0 && (
+                <View style={styles.historyMeta}>
+                  {entry.categories.length > 0 && (
+                    <Text style={[styles.bookmarkMeta, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}>
+                      {entry.categories[0]}
+                    </Text>
+                  )}
+                  {entry.categories.length > 0 && (
+                    <Text style={[styles.historyDot, { color: colors.mutedForeground }]}>·</Text>
+                  )}
                   <Text style={[styles.bookmarkMeta, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}>
-                    {post.categories[0]}
+                    {isZh ? formatVisitedAtZh(entry.visitedAt) : formatVisitedAt(entry.visitedAt)}
                   </Text>
-                )}
+                </View>
               </View>
               <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
             </Pressable>
@@ -681,6 +721,16 @@ const styles = StyleSheet.create({
     marginBottom: 3,
   },
   bookmarkMeta: {
+    fontSize: 12,
+  },
+  historyMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 4,
+    marginTop: 2,
+  },
+  historyDot: {
     fontSize: 12,
   },
 });
