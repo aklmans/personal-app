@@ -945,6 +945,9 @@ export default function PostDetailScreen() {
   const [resumeBannerPos, setResumeBannerPos] = useState<number | null>(null);
   const [selectedQuote, setSelectedQuote] = useState("");
   const [bannerVisible, setBannerVisible] = useState(false);
+  const [copyToastVisible, setCopyToastVisible] = useState(false);
+  const copyToastAnim = useRef(new Animated.Value(0)).current;
+  const copyToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { isBookmarked, toggleBookmark } = useBookmarks();
   const { recordVisit } = useHistory();
 
@@ -986,6 +989,25 @@ export default function PostDetailScreen() {
     setSelectedQuote("");
   }, [post, selectedQuote]);
 
+  const showCopyToast = useCallback(() => {
+    if (copyToastTimerRef.current) clearTimeout(copyToastTimerRef.current);
+    copyToastAnim.stopAnimation();
+    copyToastAnim.setValue(1);
+    setCopyToastVisible(true);
+    copyToastTimerRef.current = setTimeout(() => {
+      Animated.timing(copyToastAnim, { toValue: 0, duration: 220, useNativeDriver: true }).start(({ finished }) => {
+        if (finished) setCopyToastVisible(false);
+      });
+    }, 2000);
+  }, [copyToastAnim]);
+
+  useEffect(() => {
+    return () => {
+      if (copyToastTimerRef.current) clearTimeout(copyToastTimerRef.current);
+      copyToastAnim.stopAnimation();
+    };
+  }, [copyToastAnim]);
+
   const handleShare = useCallback(async () => {
     if (!post) return;
     const url = post.link;
@@ -998,14 +1020,14 @@ export default function PostDetailScreen() {
           if (err instanceof Error && err.name === "AbortError") return;
           try {
             await navigator.clipboard.writeText(url);
-            alert("Link copied to clipboard!");
+            showCopyToast();
           } catch {}
         }
         return;
       }
       try {
         await navigator.clipboard.writeText(url);
-        alert("Link copied to clipboard!");
+        showCopyToast();
       } catch {}
       return;
     }
@@ -1016,7 +1038,7 @@ export default function PostDetailScreen() {
           : { message: `${title}\n${url}` }
       );
     } catch {}
-  }, [post]);
+  }, [post, showCopyToast]);
 
   useEffect(() => {
     navigation.setOptions({
@@ -1690,6 +1712,21 @@ export default function PostDetailScreen() {
         setColorTheme={setColorTheme}
         isZh={isZh}
       />
+
+      {copyToastVisible && (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.copyToast,
+            { opacity: copyToastAnim, transform: [{ translateY: copyToastAnim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }] },
+          ]}
+        >
+          <Feather name="check" size={14} color="#ffffff" />
+          <Text style={[styles.copyToastText, { fontFamily: fonts.sans.semiBold }]}>
+            {isZh ? "链接已复制" : "Link copied"}
+          </Text>
+        </Animated.View>
+      )}
     </View>
   );
 }
@@ -1795,5 +1832,26 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 12,
     fontStyle: "italic",
+  },
+  copyToast: {
+    position: "absolute",
+    bottom: 90,
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(30,30,30,0.88)",
+    paddingVertical: 9,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    shadowColor: "#000",
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 6,
+  },
+  copyToastText: {
+    color: "#ffffff",
+    fontSize: 13,
   },
 });
