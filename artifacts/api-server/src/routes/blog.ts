@@ -119,6 +119,15 @@ const CONTENT_TTL = 15 * 60 * 1000;
 const CONTENT_DISK_CACHE_DIR = path.resolve(__dirname, "../../data/cache/content");
 const CONTENT_DISK_TTL = 24 * 60 * 60 * 1000;
 const CONTENT_DISK_MAX_ENTRIES = 200;
+// Entries older than this threshold (but still within CONTENT_DISK_TTL) are
+// silently re-fetched in the background while still being served from cache.
+const CONTENT_REVALIDATE_AGE = 12 * 60 * 60 * 1000;
+
+// Tracks the real on-disk write timestamp for each cached content URL.
+// loadContentCacheFromDisk clamps contentCache[].ts to `now` so the in-memory
+// cache always appears fresh after restart; this map preserves the actual disk
+// age so that revalidateStaleContent() can decide what needs refreshing.
+const contentDiskTs: Map<string, number> = new Map();
 
 function contentDiskCacheKey(url: string): string {
   return url
@@ -177,6 +186,9 @@ function loadContentCacheFromDisk(): void {
       // memory immediately after restart. A background re-fetch will happen
       // after CONTENT_TTL (same pattern as the post-list disk cache).
       contentCache.set(e.url, { html: e.html, ts: now });
+      // Preserve the real disk timestamp so revalidateStaleContent() can
+      // decide whether this entry needs a background refresh.
+      contentDiskTs.set(e.url, e.ts);
     }
 
     if (valid.length > 0) {
@@ -191,6 +203,7 @@ function saveContentToDisk(url: string, html: string, ts: number): void {
   try {
     fs.mkdirSync(CONTENT_DISK_CACHE_DIR, { recursive: true });
     fs.writeFileSync(contentDiskCachePath(url), JSON.stringify({ url, html, ts }), "utf8");
+    contentDiskTs.set(url, ts);
   } catch {
     // fire-and-forget, ignore write errors
   }
@@ -791,10 +804,55 @@ async function fetchFeed(locale: string): Promise<BlogPost[]> {
   return fetch$;
 }
 
+// Re-fetches content for any disk-cached entry that is older than
+// CONTENT_REVALIDATE_AGE but still within CONTENT_DISK_TTL.  Runs under the
+// shared SCRAPE_CONCURRENCY limit so it never saturates outbound connections.
+// Both the in-memory contentCache and the on-disk JSON file are updated on success.
+async function revalidateStaleContent(): Promise<void> {
+  const now = Date.now();
+  const staleUrls: string[] = [];
+  for (const [url, diskTs] of contentDiskTs.entries()) {
+    const age = now - diskTs;
+    if (age > CONTENT_REVALIDATE_AGE && age < CONTENT_DISK_TTL) {
+      staleUrls.push(url);
+    }
+  }
+  if (staleUrls.length === 0) return;
+
+  logger.info({ count: staleUrls.length }, "blog: revalidating stale content cache entries");
+
+  const tasks = staleUrls.map((url) => async () => {
+    try {
+      const res = await fetch(url, {
+        headers: { "User-Agent": "aklman-mobile/1.0" },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!res.ok) return;
+      const html = await res.text();
+      const extracted = extractArticleHtml(html);
+      const ts = Date.now();
+      contentCache.set(url, { html: extracted, ts });
+      saveContentToDisk(url, extracted, ts);
+    } catch {
+      // fire-and-forget; failures are silent to keep log noise low
+    }
+  });
+
+  await withConcurrencyLimit(tasks, SCRAPE_CONCURRENCY);
+  logger.info({ count: staleUrls.length }, "blog: content revalidation complete");
+}
+
 function warmCache(): void {
   for (const locale of Object.keys(RSS_FEEDS)) {
     doFetchFeed(locale).catch(() => {});
   }
+  // Kick off content revalidation after a short delay so it doesn't compete
+  // with the initial feed fetch on startup.
+  setTimeout(() => {
+    revalidateStaleContent().catch((err) =>
+      logger.warn({ err }, "blog: content revalidation failed")
+    );
+  }, 5000);
 }
 
 router.get("/posts", async (req, res) => {
