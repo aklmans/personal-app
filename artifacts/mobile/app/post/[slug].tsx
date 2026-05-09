@@ -1088,6 +1088,8 @@ export default function PostDetailScreen() {
       if (result.action === Share.sharedAction) {
         showCopyToast(isZh ? "已分享" : "Shared!");
         webViewRef.current?.injectJavaScript(injectQuoteHighlight);
+      } else if (result.action === Share.dismissedAction) {
+        webViewRef.current?.injectJavaScript(injectQuoteHighlight);
       }
     } catch {
       try {
