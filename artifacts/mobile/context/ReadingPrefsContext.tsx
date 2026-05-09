@@ -13,6 +13,7 @@ const LINE_SPACING_KEY = "@aklman/reading_line_spacing";
 const CONTENT_WIDTH_KEY = "@aklman/reading_content_width";
 const FONT_FAMILY_KEY = "@aklman/reading_font_family";
 const COLOR_THEME_KEY = "@aklman/reading_color_theme";
+const ACCENT_COLOR_KEY = "@aklman/reading_accent_color";
 
 export const FONT_SIZE_DEFAULT = 17;
 export const FONT_SIZE_MIN = 14;
@@ -47,6 +48,8 @@ export interface ReadingPrefs {
   hydrated: boolean;
   colorTheme: ColorTheme;
   setColorTheme: (v: ColorTheme) => void;
+  accentColor: string | null;
+  setAccentColor: (v: string | null) => void;
 }
 
 const defaultPrefs: ReadingPrefs = {
@@ -64,6 +67,8 @@ const defaultPrefs: ReadingPrefs = {
   hydrated: false,
   colorTheme: COLOR_THEME_DEFAULT,
   setColorTheme: () => {},
+  accentColor: null,
+  setAccentColor: () => {},
 };
 
 const ReadingPrefsContext = createContext<ReadingPrefs>(defaultPrefs);
@@ -87,6 +92,7 @@ export function ReadingPrefsProvider({
   const [colorTheme, setColorThemeState] = useState<ColorTheme>(
     COLOR_THEME_DEFAULT
   );
+  const [accentColor, setAccentColorState] = useState<string | null>(null);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -96,8 +102,9 @@ export function ReadingPrefsProvider({
       AsyncStorage.getItem(CONTENT_WIDTH_KEY),
       AsyncStorage.getItem(FONT_FAMILY_KEY),
       AsyncStorage.getItem(COLOR_THEME_KEY),
+      AsyncStorage.getItem(ACCENT_COLOR_KEY),
     ])
-      .then(([storedSize, storedSpacing, storedWidth, storedFamily, storedTheme]) => {
+      .then(([storedSize, storedSpacing, storedWidth, storedFamily, storedTheme, storedAccent]) => {
         if (storedSize !== null) {
           const parsed = parseInt(storedSize, 10);
           if (!isNaN(parsed) && parsed >= FONT_SIZE_MIN && parsed <= FONT_SIZE_MAX) {
@@ -118,6 +125,9 @@ export function ReadingPrefsProvider({
         }
         if (storedTheme === "default" || storedTheme === "sepia" || storedTheme === "high-contrast") {
           setColorThemeState(storedTheme as ColorTheme);
+        }
+        if (storedAccent && /^#[0-9a-fA-F]{6}$/.test(storedAccent)) {
+          setAccentColorState(storedAccent);
         }
         setHydrated(true);
       })
@@ -171,6 +181,15 @@ export function ReadingPrefsProvider({
     AsyncStorage.setItem(COLOR_THEME_KEY, v);
   }, []);
 
+  const setAccentColor = useCallback((v: string | null) => {
+    setAccentColorState(v);
+    if (v === null) {
+      AsyncStorage.removeItem(ACCENT_COLOR_KEY);
+    } else {
+      AsyncStorage.setItem(ACCENT_COLOR_KEY, v);
+    }
+  }, []);
+
   const value: ReadingPrefs = {
     fontSize,
     canIncrease: fontSize < FONT_SIZE_MAX,
@@ -186,6 +205,8 @@ export function ReadingPrefsProvider({
     hydrated,
     colorTheme,
     setColorTheme,
+    accentColor,
+    setAccentColor,
   };
 
   return (

@@ -193,6 +193,16 @@ const COLOR_THEME_OPTS: { value: ColorTheme; label: string; labelZh: string; bg:
   { value: "high-contrast", label: "High Contrast", labelZh: "高对比", bg: "#000000", fg: "#ffffff" },
 ];
 
+const ACCENT_PRESETS: { hex: string | null; label: string; labelZh: string }[] = [
+  { hex: null,      label: "Auto",     labelZh: "自动"   },
+  { hex: "#DA7756", label: "Rust",     labelZh: "锈红"   },
+  { hex: "#5B9BD5", label: "Sky",      labelZh: "天蓝"   },
+  { hex: "#6AAB8E", label: "Sage",     labelZh: "鼠尾草" },
+  { hex: "#9B7DC8", label: "Lavender", labelZh: "薰衣草" },
+  { hex: "#C4627B", label: "Rose",     labelZh: "玫瑰"   },
+  { hex: "#D4A839", label: "Amber",    labelZh: "琥珀"   },
+];
+
 function ReadingPrefsSheet({
   visible,
   onClose,
@@ -204,6 +214,8 @@ function ReadingPrefsSheet({
   setFontFamily,
   colorTheme,
   setColorTheme,
+  accentColor,
+  setAccentColor,
   isZh,
 }: {
   visible: boolean;
@@ -216,6 +228,8 @@ function ReadingPrefsSheet({
   setFontFamily: (v: FontFamily) => void;
   colorTheme: ColorTheme;
   setColorTheme: (v: ColorTheme) => void;
+  accentColor: string | null;
+  setAccentColor: (v: string | null) => void;
   isZh: boolean;
 }) {
   const colors = useColors();
@@ -446,6 +460,68 @@ function ReadingPrefsSheet({
             );
           })}
         </View>
+
+        <Text
+          style={[
+            sheetStyles.sectionLabel,
+            {
+              color: colors.mutedForeground,
+              fontFamily: fonts.sans.semiBold,
+              marginTop: 18,
+            },
+          ]}
+        >
+          {isZh ? "强调色" : "ACCENT COLOR"}
+        </Text>
+        <View style={sheetStyles.accentRow}>
+          {ACCENT_PRESETS.map((preset) => {
+            const active = accentColor === preset.hex;
+            if (preset.hex === null) {
+              return (
+                <Pressable
+                  key="auto"
+                  onPress={() => setAccentColor(null)}
+                  style={({ pressed }) => [
+                    sheetStyles.accentDot,
+                    {
+                      backgroundColor: colors.secondary,
+                      borderColor: active ? colors.primary : colors.border,
+                      borderWidth: active ? 2 : 1,
+                      opacity: pressed ? 0.72 : 1,
+                    },
+                  ]}
+                  accessibilityLabel={isZh ? "自动" : "Auto"}
+                  accessibilityRole="button"
+                >
+                  <Text style={[sheetStyles.accentAutoLabel, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}>
+                    {isZh ? "自动" : "Auto"}
+                  </Text>
+                </Pressable>
+              );
+            }
+            return (
+              <Pressable
+                key={preset.hex}
+                onPress={() => setAccentColor(preset.hex as string)}
+                style={({ pressed }) => [
+                  sheetStyles.accentDot,
+                  {
+                    backgroundColor: preset.hex as string,
+                    borderColor: active ? colors.text : "transparent",
+                    borderWidth: active ? 2 : 0,
+                    opacity: pressed ? 0.72 : 1,
+                  },
+                ]}
+                accessibilityLabel={isZh ? preset.labelZh : preset.label}
+                accessibilityRole="button"
+              >
+                {active && (
+                  <Feather name="check" size={12} color="#fff" />
+                )}
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
     </Modal>
   );
@@ -498,6 +574,15 @@ const sheetStyles = StyleSheet.create({
   },
   optLabel: { fontSize: 13 },
   themeBtn: { minWidth: 0 },
+  accentRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
+  accentDot: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  accentAutoLabel: { fontSize: 10, textAlign: "center" },
 });
 
 interface PostWithContent {
@@ -527,10 +612,23 @@ function resolveThemeColors(
   return { bg: defaultBg, text: defaultText };
 }
 
-function resolveHighlightColor(colorTheme: ColorTheme): string {
+function hexToHighlight(hex: string): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},0.35)`;
+}
+
+function resolveHighlightColor(colorTheme: ColorTheme, accentColor: string | null = null): string {
+  if (accentColor && /^#[0-9a-fA-F]{6}$/.test(accentColor)) return hexToHighlight(accentColor);
   if (colorTheme === "sepia") return "rgba(160,100,40,0.38)";
   if (colorTheme === "high-contrast") return "rgba(255,220,0,0.45)";
   return "rgba(218,119,86,0.35)";
+}
+
+function resolveLinkColor(colorTheme: ColorTheme, accentColor: string | null, defaultPrimary: string): string {
+  if (accentColor && /^#[0-9a-fA-F]{6}$/.test(accentColor)) return accentColor;
+  return defaultPrimary;
 }
 
 function buildInjectedJS(
@@ -540,7 +638,8 @@ function buildInjectedJS(
   fontFamily: FontFamily,
   colorTheme: ColorTheme,
   defaultBg: string,
-  defaultText: string
+  defaultText: string,
+  accentColor: string | null = null
 ): string {
   const maxW = contentWidth === "narrow" ? "680px" : "100%";
   const padH = contentWidth === "narrow" ? "24px" : "20px";
@@ -548,7 +647,7 @@ function buildInjectedJS(
     ? "'Inter', system-ui, sans-serif"
     : "'Lora', Georgia, 'Times New Roman', serif";
   const { bg, text } = resolveThemeColors(colorTheme, defaultBg, defaultText);
-  const highlightColor = resolveHighlightColor(colorTheme);
+  const highlightColor = resolveHighlightColor(colorTheme, accentColor);
   return `(function() {
   document.documentElement.style.setProperty('font-size', '${fontSize}px', 'important');
   document.body.style.lineHeight = '${lineSpacing}';
@@ -596,11 +695,12 @@ function buildHtml(
   lineSpacing = 1.85,
   contentWidth: ContentWidth = "full",
   fontFamily: FontFamily = "serif",
-  colorTheme: ColorTheme = "default"
+  colorTheme: ColorTheme = "default",
+  accentColor: string | null = null
 ): string {
   const { bg, text } = resolveThemeColors(colorTheme, colors.background, colors.text);
-  const highlightColor = resolveHighlightColor(colorTheme);
-  const primary = colors.primary;
+  const highlightColor = resolveHighlightColor(colorTheme, accentColor);
+  const primary = resolveLinkColor(colorTheme, accentColor, colors.primary);
   const muted = colors.mutedForeground;
   const codeBg = isDark ? "#2e2825" : "#ede8e0";
   const border = colors.border;
@@ -963,6 +1063,7 @@ export default function PostDetailScreen() {
     lineSpacing, setLineSpacing, contentWidth, setContentWidth,
     fontFamily, setFontFamily, hydrated,
     colorTheme, setColorTheme,
+    accentColor, setAccentColor,
   } = useReadingPrefs();
   const [sheetVisible, setSheetVisible] = useState(false);
   const [resumeBannerPos, setResumeBannerPos] = useState<number | null>(null);
@@ -1383,9 +1484,9 @@ export default function PostDetailScreen() {
   useEffect(() => {
     if (Platform.OS !== "web" && webViewRef.current) {
       const { bg, text } = resolveThemeColors(colorTheme, colors.background, colors.text);
-      const primary = colors.primary;
+      const primary = resolveLinkColor(colorTheme, accentColor, colors.primary);
       const muted = colors.mutedForeground;
-      const highlightColor = resolveHighlightColor(colorTheme);
+      const highlightColor = resolveHighlightColor(colorTheme, accentColor);
       webViewRef.current.injectJavaScript(
         `(function(){` +
         `document.body.style.transition='background-color 0.25s, color 0.25s';` +
@@ -1402,19 +1503,19 @@ export default function PostDetailScreen() {
         `})();true;`
       );
     }
-  }, [colorTheme, colors.background, colors.text, colors.primary, colors.mutedForeground]);
+  }, [colorTheme, accentColor, colors.background, colors.text, colors.primary, colors.mutedForeground]);
 
   const htmlContent = useMemo(
-    () => (post ? buildHtml(post.content ?? "", colors, isDark, 17, 1.85, "full", "serif", colorTheme) : ""),
-    [post, colors, isDark, colorTheme]
+    () => (post ? buildHtml(post.content ?? "", colors, isDark, 17, 1.85, "full", "serif", colorTheme, accentColor) : ""),
+    [post, colors, isDark, colorTheme, accentColor]
   );
 
   const webHtmlContent = useMemo(
     () =>
       post
-        ? buildHtml(post.content ?? "", colors, isDark, fontSize, lineSpacing, contentWidth, fontFamily, colorTheme)
+        ? buildHtml(post.content ?? "", colors, isDark, fontSize, lineSpacing, contentWidth, fontFamily, colorTheme, accentColor)
         : "",
-    [post, colors, isDark, fontSize, lineSpacing, contentWidth, fontFamily, colorTheme]
+    [post, colors, isDark, fontSize, lineSpacing, contentWidth, fontFamily, colorTheme, accentColor]
   );
 
   const onWebViewMessage = useCallback(
@@ -1696,7 +1797,7 @@ export default function PostDetailScreen() {
           javaScriptEnabled
           domStorageEnabled={false}
           allowsInlineMediaPlayback={false}
-          injectedJavaScript={buildInjectedJS(fontSize, lineSpacing, contentWidth, fontFamily, colorTheme, colors.background, colors.text)}
+          injectedJavaScript={buildInjectedJS(fontSize, lineSpacing, contentWidth, fontFamily, colorTheme, colors.background, colors.text, accentColor)}
           onMessage={onWebViewMessage}
           onLoadEnd={() => { restoreScrollPosition(); }}
         />
@@ -1942,6 +2043,8 @@ export default function PostDetailScreen() {
         setFontFamily={setFontFamily}
         colorTheme={colorTheme}
         setColorTheme={setColorTheme}
+        accentColor={accentColor}
+        setAccentColor={setAccentColor}
         isZh={isZh}
       />
 
