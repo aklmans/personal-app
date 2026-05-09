@@ -1075,6 +1075,7 @@ export default function PostDetailScreen() {
       setSelectedQuote("");
       return;
     }
+    const injectQuoteHighlight = `(function(){var sel=window.getSelection();if(!sel||sel.rangeCount===0)return;var range=sel.getRangeAt(0);var mark=document.createElement('span');mark.style.cssText='background:rgba(218,119,86,0.35);border-radius:2px;transition:background 1.5s ease-out';try{var frag=range.extractContents();mark.appendChild(frag);range.insertNode(mark);sel.removeAllRanges();setTimeout(function(){mark.style.background='transparent';setTimeout(function(){var p=mark.parentNode;if(p){while(mark.firstChild)p.insertBefore(mark.firstChild,mark);p.removeChild(mark);}},1500);},50);}catch(err){document.body.style.transition='background 0.3s ease';document.body.style.background='rgba(218,119,86,0.12)';setTimeout(function(){document.body.style.background='';},700);}})();true;`;
     try {
       const result = await Share.share(
         Platform.OS === "ios"
@@ -1086,11 +1087,13 @@ export default function PostDetailScreen() {
       // so we show feedback in both cases.
       if (result.action === Share.sharedAction) {
         showCopyToast(isZh ? "已分享" : "Shared!");
+        webViewRef.current?.injectJavaScript(injectQuoteHighlight);
       }
     } catch {
       try {
         await Clipboard.setStringAsync(message);
         showCopyToast(isZh ? "引用已复制" : "Quote copied");
+        webViewRef.current?.injectJavaScript(injectQuoteHighlight);
       } catch {}
     }
     setSelectedQuote("");
