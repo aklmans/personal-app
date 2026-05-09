@@ -172,6 +172,12 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   const pushTokenRef = useRef<string | null>(null);
   const prevLocaleRef = useRef<string>(locale);
   const mutedSlugsRef = useRef<string[]>([]);
+  const pendingLocaleRetryRef = useRef<{
+    token: string;
+    locale: string;
+    categories: string[];
+    mutedSlugs: string[];
+  } | null>(null);
 
   useEffect(() => {
     fetchAvailableCategories();
@@ -186,7 +192,17 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       .then(async (token) => {
         if (!token) return;
         const ok = await registerToken(token, locale, notifCategories, mutedSlugsRef.current);
-        if (ok) setLocaleRegisteredAt(Date.now());
+        if (ok) {
+          setLocaleRegisteredAt(Date.now());
+          pendingLocaleRetryRef.current = null;
+        } else {
+          pendingLocaleRetryRef.current = {
+            token,
+            locale,
+            categories: notifCategories,
+            mutedSlugs: mutedSlugsRef.current,
+          };
+        }
       })
       .catch(() => {});
   }, [locale, optedIn, notifCategories]);
@@ -266,6 +282,16 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     const appStateSub = AppState.addEventListener("change", (nextState) => {
       if (nextState === "active") {
         clearBadge(pushTokenRef.current).catch(() => {});
+        const retry = pendingLocaleRetryRef.current;
+        if (retry) {
+          registerToken(retry.token, retry.locale, retry.categories, retry.mutedSlugs)
+            .then((ok) => {
+              if (ok) {
+                pendingLocaleRetryRef.current = null;
+              }
+            })
+            .catch(() => {});
+        }
       }
     });
 
