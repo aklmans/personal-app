@@ -946,6 +946,10 @@ router.get("/posts", async (req, res) => {
     const limit = Math.min(100, Math.max(1, parseInt((req.query["limit"] as string) || "20", 10)));
 
     let posts = await fetchFeed(locale);
+    const isStale = refreshInProgress[locale] === true;
+    if (isStale) {
+      res.setHeader("X-Cache", "stale");
+    }
 
     if (category) {
       posts = posts.filter((p) =>
@@ -980,6 +984,7 @@ router.get("/posts", async (req, res) => {
       total,
       totalPages,
       hasMore: page < totalPages,
+      stale: isStale,
     });
   } catch {
     res.status(500).json({ error: "Failed to fetch posts" });

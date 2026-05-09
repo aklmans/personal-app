@@ -1,7 +1,8 @@
 import { useRouter } from "expo-router";
-import React, { useCallback } from "react";
+import React, { useCallback, useEffect, useRef } from "react";
 import {
   ActivityIndicator,
+  Animated,
   FlatList,
   Image,
   Platform,
@@ -39,6 +40,7 @@ export default function HomeScreen() {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
+    isStale,
   } = usePaginatedPosts({ locale, limit: 10 });
 
   const allPosts = data?.pages.flatMap((p) => p.posts) ?? [];
@@ -53,6 +55,16 @@ export default function HomeScreen() {
     },
     [router]
   );
+
+  const staleOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(staleOpacity, {
+      toValue: isStale && !isLoading ? 1 : 0,
+      duration: 300,
+      useNativeDriver: false,
+    }).start();
+  }, [isStale, isLoading, staleOpacity]);
 
   const topPad =
     Platform.OS === "web" ? Math.max(insets.top, 67) : insets.top;
@@ -82,6 +94,7 @@ export default function HomeScreen() {
           },
         ]}
       >
+
         <Text
           style={[
             styles.blogName,
@@ -104,6 +117,15 @@ export default function HomeScreen() {
           </Text>
         </Pressable>
       </View>
+
+      <Animated.View
+        style={[styles.staleBar, { opacity: staleOpacity, backgroundColor: colors.muted, pointerEvents: "none" }]}
+      >
+        <ActivityIndicator size="small" color={colors.mutedForeground} style={styles.staleSpinner} />
+        <Text style={[styles.staleText, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}>
+          {isZh ? "刷新中…" : "Refreshing…"}
+        </Text>
+      </Animated.View>
 
       {isLoading ? (
         <View style={[styles.content, { paddingTop: 16 }]}>
@@ -295,6 +317,20 @@ const styles = StyleSheet.create({
   footerLoader: {
     paddingVertical: 20,
     alignItems: "center",
+  },
+  staleBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 6,
+    gap: 6,
+  },
+  staleSpinner: {
+    transform: [{ scale: 0.75 }],
+  },
+  staleText: {
+    fontSize: 12,
+    letterSpacing: 0.1,
   },
   continueSection: {
     paddingTop: 20,

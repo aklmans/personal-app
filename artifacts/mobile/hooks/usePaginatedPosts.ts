@@ -9,10 +9,12 @@ export interface PaginatedPostsParams {
   limit?: number;
 }
 
+const STALE_POLL_INTERVAL_MS = 8000;
+
 export function usePaginatedPosts(params: PaginatedPostsParams) {
   const limit = params.limit ?? 20;
 
-  return useInfiniteQuery({
+  const query = useInfiniteQuery({
     queryKey: ["/api/blog/posts", params],
     queryFn: ({ pageParam }) =>
       listBlogPosts({
@@ -26,5 +28,13 @@ export function usePaginatedPosts(params: PaginatedPostsParams) {
     initialPageParam: 1,
     getNextPageParam: (lastPage) =>
       lastPage.hasMore ? lastPage.page + 1 : undefined,
+    refetchInterval: (query) => {
+      const firstPage = query.state.data?.pages?.[0];
+      return firstPage?.stale ? STALE_POLL_INTERVAL_MS : false;
+    },
   });
+
+  const isStale = query.data?.pages?.[0]?.stale === true;
+
+  return { ...query, isStale };
 }

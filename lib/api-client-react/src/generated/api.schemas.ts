@@ -47,6 +47,7 @@ export interface BlogPostPage {
   total: number;
   totalPages: number;
   hasMore: boolean;
+  stale?: boolean;
 }
 
 export interface ErrorResponse {
