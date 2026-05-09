@@ -565,7 +565,7 @@ export default function MoreScreen() {
                 {readingStats.topCategories.length > 0 ? readingStats.topCategories.join(" · ") : "—"}
               </Text>
               <Text style={[styles.statLabel, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}>
-                {isZh ? "最多分类" : "Top Category"}
+                {isZh ? "最多分类" : readingStats.topCategories.length > 1 ? "Top Categories" : "Top Category"}
               </Text>
             </View>
           </View>
