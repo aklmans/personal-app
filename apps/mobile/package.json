@@ -6,8 +6,6 @@
   "scripts": {
     "dev": "expo start",
     "dev:tunnel": "expo start --tunnel",
-    "build": "node scripts/build.js",
-    "serve": "node server/serve.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "android": "expo run:android",
     "ios": "expo run:ios"
