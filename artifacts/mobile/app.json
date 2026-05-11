@@ -14,7 +14,8 @@
       "backgroundColor": "#f7f3ed"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "com.anonymous.mobile"
     },
     "android": {},
     "web": {
