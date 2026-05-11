@@ -44,8 +44,8 @@ interface CacheEntry {
   timestamp: number;
 }
 
-// __dirname at runtime is <repo>/artifacts/api-server/dist (esbuild output).
-// Two levels up lands at <repo>/artifacts/data/cache — the shared persistent store.
+// __dirname at runtime is <repo>/apps/api/dist (esbuild output).
+// Two levels up lands at <repo>/apps/api/data/cache — the persistent store.
 const DISK_CACHE_DIR = path.resolve(__dirname, "../../data/cache");
 
 function diskCachePath(locale: string): string {
