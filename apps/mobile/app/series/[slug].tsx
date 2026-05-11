@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
-import { useListBlogSeries, queryOpts } from "@workspace/api-client-react";
-import type { BlogPost } from "@workspace/api-client-react";
+import { useListBlogSeries, queryOpts } from "@aklman/api-client";
+import type { BlogPost } from "@aklman/api-client";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import React, { useCallback, useEffect } from "react";
 import {

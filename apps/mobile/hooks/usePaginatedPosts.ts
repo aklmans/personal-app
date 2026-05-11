@@ -1,5 +1,5 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { listBlogPosts } from "@workspace/api-client-react";
+import { listBlogPosts } from "@aklman/api-client";
 
 export interface PaginatedPostsParams {
   locale?: string;

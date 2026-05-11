@@ -1,7 +1,7 @@
 import {
   useListBlogCategories,
   queryOpts,
-} from "@workspace/api-client-react";
+} from "@aklman/api-client";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
 import {

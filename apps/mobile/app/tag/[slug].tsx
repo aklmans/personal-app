@@ -1,4 +1,4 @@
-import { useListBlogTags, queryOpts } from "@workspace/api-client-react";
+import { useListBlogTags, queryOpts } from "@aklman/api-client";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import React, { useCallback, useEffect } from "react";
 import {

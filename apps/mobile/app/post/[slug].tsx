@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
-import { useGetBlogPost, queryOpts } from "@workspace/api-client-react";
-import type { RelatedPost } from "@workspace/api-client-react";
+import { useGetBlogPost, queryOpts } from "@aklman/api-client";
+import type { RelatedPost } from "@aklman/api-client";
 import * as Clipboard from "expo-clipboard";
 import * as WebBrowser from "expo-web-browser";
 import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from "expo-router";
