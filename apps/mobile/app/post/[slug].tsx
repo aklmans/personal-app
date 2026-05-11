@@ -1768,7 +1768,7 @@ export default function PostDetailScreen() {
                   backgroundColor: colors.primary,
                   width: progressAnim.interpolate({ inputRange: [0, 1], outputRange: ["0%", "100%"] }),
                 },
-                { transition: "width 80ms linear" } as unknown as React.CSSProperties,
+                { transition: "width 80ms linear" } as any,
               ]}
             />
           </View>
