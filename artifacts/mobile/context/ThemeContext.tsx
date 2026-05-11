@@ -6,7 +6,7 @@ import React, {
   useEffect,
   useState,
 } from "react";
-import { useColorScheme } from "react-native";
+import { Appearance, useColorScheme } from "react-native";
 
 export type ThemePreference = "light" | "dark" | "system";
 export type ResolvedTheme = "light" | "dark";
@@ -44,6 +44,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       }
     });
   }, []);
+
+  // Push the user's preference down to the native trait collection so
+  // SwiftUI-rendered chrome (iOS 26 Liquid Glass NativeTabs, system pickers,
+  // alerts, etc.) follows the in-app theme picker. Without this the JS side
+  // tints correctly but the native tab bar stays on the OS-level appearance,
+  // which causes the bottom bar to flash light cream while content is dark.
+  useEffect(() => {
+    Appearance.setColorScheme(preference === "system" ? null : preference);
+  }, [preference]);
 
   const setPreference = useCallback((pref: ThemePreference) => {
     setPreferenceSt(pref);
