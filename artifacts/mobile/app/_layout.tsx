@@ -29,8 +29,13 @@ import { ReadingPrefsProvider } from "@/context/ReadingPrefsContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { useColors } from "@/hooks/useColors";
 
-const domain = process.env.EXPO_PUBLIC_DOMAIN ?? "localhost:8080";
-setBaseUrl(`https://${domain}`);
+const domain = process.env.EXPO_PUBLIC_DOMAIN ?? "localhost:5001";
+const scheme =
+  process.env.EXPO_PUBLIC_SCHEME ??
+  (/^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(domain)
+    ? "http"
+    : "https");
+setBaseUrl(`${scheme}://${domain}`);
 
 SplashScreen.preventAutoHideAsync();
 
