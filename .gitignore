@@ -50,3 +50,4 @@ Thumbs.db
 
 # Runtime cache files (written by the server, not developer-authored)
 artifacts/data/cache/
+data/
