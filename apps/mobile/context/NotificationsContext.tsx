@@ -11,15 +11,12 @@ import React, {
 import { AppState, Platform } from "react-native";
 import { useRouter } from "expo-router";
 import { useLanguage } from "./LanguageContext";
+import { API_BASE } from "@/lib/api-base";
 
 const STORAGE_KEY = "@notifications_opted_in_v1";
 const STORAGE_TOKEN_KEY = "@notifications_push_token_v1";
 const STORAGE_CATEGORIES_KEY = "@notifications_categories_v1";
 const STORAGE_MUTED_SLUGS_KEY = "@notifications_muted_slugs_v1";
-
-const domain = process.env.EXPO_PUBLIC_DOMAIN ?? "localhost:8080";
-const isLocalDev = domain.startsWith("localhost") || domain.startsWith("127.");
-const API_BASE = `${isLocalDev ? "http" : "https"}://${domain}/api`;
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
