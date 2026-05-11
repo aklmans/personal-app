@@ -7,32 +7,35 @@ import { SymbolView } from "expo-symbols";
 import React from "react";
 import { Platform, StyleSheet, View, useColorScheme } from "react-native";
 
+import { useLanguage } from "@/context/LanguageContext";
 import { useColors } from "@/hooks/useColors";
 
 function NativeTabLayout() {
+  const { isZh } = useLanguage();
   return (
     <NativeTabs>
       <NativeTabs.Trigger name="index">
         <Icon sf={{ default: "house", selected: "house.fill" }} />
-        <Label>Home</Label>
+        <Label>{isZh ? "首页" : "Home"}</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="posts">
         <Icon sf={{ default: "book", selected: "book.fill" }} />
-        <Label>Posts</Label>
+        <Label>{isZh ? "文章" : "Posts"}</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="search">
         <Icon sf={{ default: "magnifyingglass", selected: "magnifyingglass" }} />
-        <Label>Search</Label>
+        <Label>{isZh ? "搜索" : "Search"}</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="more">
         <Icon sf={{ default: "ellipsis.circle", selected: "ellipsis.circle.fill" }} />
-        <Label>More</Label>
+        <Label>{isZh ? "更多" : "More"}</Label>
       </NativeTabs.Trigger>
     </NativeTabs>
   );
 }
 
 function ClassicTabLayout() {
+  const { isZh } = useLanguage();
   const colors = useColors();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
@@ -73,7 +76,7 @@ function ClassicTabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Home",
+          title: isZh ? "首页" : "Home",
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="house" tintColor={color} size={23} />
@@ -85,7 +88,7 @@ function ClassicTabLayout() {
       <Tabs.Screen
         name="posts"
         options={{
-          title: "Posts",
+          title: isZh ? "文章" : "Posts",
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="book" tintColor={color} size={23} />
@@ -97,7 +100,7 @@ function ClassicTabLayout() {
       <Tabs.Screen
         name="search"
         options={{
-          title: "Search",
+          title: isZh ? "搜索" : "Search",
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="magnifyingglass" tintColor={color} size={23} />
@@ -109,7 +112,7 @@ function ClassicTabLayout() {
       <Tabs.Screen
         name="more"
         options={{
-          title: "More",
+          title: isZh ? "更多" : "More",
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="ellipsis.circle" tintColor={color} size={23} />
