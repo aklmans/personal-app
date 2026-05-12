@@ -10,6 +10,7 @@ import {
 } from "react-native";
 
 import { fonts } from "@/constants/fonts";
+import { resolvePostCoverImageUri } from "@/constants/postCover";
 import { useBookmarks } from "@/context/BookmarksContext";
 import { useHistory } from "@/context/HistoryContext";
 import { useNotifications } from "@/context/NotificationsContext";
@@ -54,7 +55,7 @@ export function PostCard({ post, onPress }: PostCardProps) {
   const bookmarked = isBookmarked(post.slug, post.locale);
   const read = hasRead(post.slug, post.locale);
   const muted = mutedSlugs.includes(post.slug);
-  const coverImageUri = imageFailed ? null : post.coverImage;
+  const coverImageUri = imageFailed ? null : resolvePostCoverImageUri(post.coverImage);
 
   useEffect(() => {
     setImageFailed(false);
