@@ -52,6 +52,7 @@ export function buildInjectedJS(
   const fontStack = fontFamily === "sans"
     ? "'Inter', system-ui, sans-serif"
     : "'Lora', Georgia, 'Times New Roman', serif";
+  const fontStackJs = JSON.stringify(fontStack);
   const { bg, text } = resolveThemeColors(colorTheme, defaultBg, defaultText);
   const highlightColor = resolveHighlightColor(colorTheme, accentColor);
   return `(function() {
@@ -62,7 +63,7 @@ export function buildInjectedJS(
   document.body.style.paddingRight = '${padH}';
   document.body.style.marginLeft = 'auto';
   document.body.style.marginRight = 'auto';
-  document.body.style.fontFamily = '${fontStack}';
+  document.body.style.fontFamily = ${fontStackJs};
   document.body.style.backgroundColor = '${bg}';
   document.body.style.color = '${text}';
   document.documentElement.style.backgroundColor = '${bg}';
