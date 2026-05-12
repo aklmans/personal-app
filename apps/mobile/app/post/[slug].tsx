@@ -13,7 +13,6 @@ import {
   Pressable,
   ScrollView,
   Share,
-  StyleSheet,
   Text,
   View,
 } from "react-native";
@@ -36,8 +35,10 @@ import {
   resolveLinkColor,
   resolveThemeColors,
 } from "@/features/post-detail/postHtml";
-import { FontSizeControls } from "@/features/post-detail/FontSizeControls";
+import { styles } from "@/features/post-detail/postDetail.styles";
+import { PostHeaderActions } from "@/features/post-detail/PostHeaderActions";
 import { PostHeaderTitle } from "@/features/post-detail/PostHeaderTitle";
+import { QuoteShareBar } from "@/features/post-detail/QuoteShareBar";
 import { ReadingPrefsSheet } from "@/features/post-detail/ReadingPrefsSheet";
 import {
   SCROLL_KEY_PREFIX,
@@ -300,72 +301,21 @@ export default function PostDetailScreen() {
           }
         : {}),
       headerRight: () => {
-        const bookmarked = post ? isBookmarked(post.slug, post.locale) : false;
         return (
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-            <Pressable
-              onPress={() => setSheetVisible(true)}
-              hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
-              style={({ pressed }) => ({
-                opacity: pressed ? 0.5 : 1,
-                paddingHorizontal: 6,
-                paddingVertical: 4,
-              })}
-              accessibilityLabel="Reading preferences"
-              accessibilityRole="button"
-            >
-              <Feather name="sliders" size={18} color={themeColors.text} />
-            </Pressable>
-            {post && (
-              <Pressable
-                onPress={() => {
-                  if (!post) return;
-                  toggleBookmark({
-                    slug: post.slug,
-                    title: post.title,
-                    description: post.description,
-                    pubDate: post.pubDate,
-                    link: post.link,
-                    coverImage: post.coverImage,
-                    categories: post.categories,
-                    readingTime: post.readingTime,
-                    locale: post.locale,
-                  });
-                }}
-                hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
-                style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1, paddingHorizontal: 6, paddingVertical: 4 })}
-                accessibilityLabel={bookmarked ? "Remove bookmark" : "Bookmark article"}
-                accessibilityRole="button"
-              >
-                <Feather
-                  name="bookmark"
-                  size={20}
-                  color={bookmarked
-                    ? (colorTheme === "default" ? colors.primary : themeColors.text)
-                    : themeIconMuted}
-                />
-              </Pressable>
-            )}
-            <FontSizeControls
-              onDecrease={decrease}
-              onIncrease={increase}
-              canDecrease={canDecrease}
-              canIncrease={canIncrease}
-              primaryColor={colorTheme === "default" ? colors.primary : themeColors.text}
-              mutedColor={themeIconMuted}
-            />
-            {post && (
-              <Pressable
-                onPress={handleShare}
-                hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
-                style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1, paddingHorizontal: 6, paddingVertical: 4 })}
-                accessibilityLabel="Share article"
-                accessibilityRole="button"
-              >
-                <Feather name="share-2" size={20} color={themeColors.text} />
-              </Pressable>
-            )}
-          </View>
+          <PostHeaderActions
+            post={post ?? null}
+            isBookmarked={isBookmarked}
+            toggleBookmark={toggleBookmark}
+            onOpenReadingPrefs={() => setSheetVisible(true)}
+            onShare={handleShare}
+            decrease={decrease}
+            increase={increase}
+            canDecrease={canDecrease}
+            canIncrease={canIncrease}
+            primaryColor={colorTheme === "default" ? colors.primary : themeColors.text}
+            textColor={themeColors.text}
+            mutedColor={themeIconMuted}
+          />
         );
       },
     });
@@ -932,51 +882,14 @@ export default function PostDetailScreen() {
       )}
 
       {selectedQuote.length > 0 && (
-        <View
-          style={[
-            styles.shareQuoteBar,
-            { backgroundColor: colors.card, borderColor: colors.border },
-          ]}
-        >
-          {selectedQuote.length > QUOTE_MAX_LENGTH ? (
-            <View style={styles.shareQuoteTooLong}>
-              <Feather name="alert-circle" size={13} color={colors.mutedForeground} />
-              <Text style={[styles.shareQuoteTooLongText, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}>
-                {isZh ? "引用过长，请选择较短的片段" : "Selection too long — try a shorter quote"}
-              </Text>
-            </View>
-          ) : (
-            <Pressable
-              onPress={handleShareQuote}
-              accessibilityRole="button"
-              accessibilityLabel={isZh ? (Platform.OS === "web" ? "复制引用" : "分享引用") : (Platform.OS === "web" ? "Copy quote" : "Share quote")}
-              style={({ pressed }) => [
-                styles.shareQuoteBtn,
-                { backgroundColor: pressed ? "#c05540" : colors.primary },
-              ]}
-            >
-              <Feather name={Platform.OS === "web" ? "copy" : "share-2"} size={13} color="#ffffff" />
-              <Text style={[styles.shareQuoteBtnText, { fontFamily: fonts.sans.semiBold }]}>
-                {isZh ? (Platform.OS === "web" ? "复制引用" : "分享引用") : (Platform.OS === "web" ? "Copy quote" : "Share quote")}
-              </Text>
-            </Pressable>
-          )}
-          <Text
-            style={[styles.shareQuotePreview, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}
-            numberOfLines={1}
-          >
-            {selectedQuote}
-          </Text>
-          <Pressable
-            onPress={() => setSelectedQuote("")}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            accessibilityRole="button"
-            accessibilityLabel={isZh ? "取消" : "Dismiss"}
-            style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
-          >
-            <Feather name="x" size={16} color={colors.mutedForeground} />
-          </Pressable>
-        </View>
+        <QuoteShareBar
+          selectedQuote={selectedQuote}
+          quoteMaxLength={QUOTE_MAX_LENGTH}
+          colors={colors}
+          isZh={isZh}
+          onShareQuote={handleShareQuote}
+          onDismiss={() => setSelectedQuote("")}
+        />
       )}
 
       {bannerVisible && Platform.OS !== "web" && (
@@ -1090,145 +1003,3 @@ export default function PostDetailScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  root: { flex: 1 },
-  center: { alignItems: "center", justifyContent: "center", gap: 12 },
-  webview: { flex: 1 },
-  metaSection: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  tagsRow: {
-    paddingVertical: 10,
-  },
-  tagsScroll: {
-    paddingHorizontal: 16,
-    gap: 8,
-  },
-  tagChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  tagChipText: { fontSize: 13 },
-  relatedSection: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    paddingTop: 12,
-    paddingHorizontal: 16,
-    paddingBottom: 4,
-  },
-  relatedLabel: {
-    fontSize: 11,
-    letterSpacing: 1.2,
-    marginBottom: 8,
-  },
-  relatedRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    borderWidth: StyleSheet.hairlineWidth,
-    marginBottom: 6,
-    gap: 8,
-  },
-  relatedContent: { flex: 1 },
-  relatedTitle: { fontSize: 14, lineHeight: 20, marginBottom: 2 },
-  relatedCat: { fontSize: 12 },
-  footer: {
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  openBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    borderRadius: 8,
-    paddingVertical: 13,
-    paddingHorizontal: 20,
-    marginBottom: 4,
-  },
-  openBtnText: { color: "#ffffff", fontSize: 15 },
-  errorText: { fontSize: 16, marginTop: 8 },
-  resumeBanner: {
-    flexDirection: "column",
-    borderRadius: 10,
-    borderWidth: 1,
-    paddingVertical: 11,
-    paddingHorizontal: 14,
-  },
-  swipeHintHandle: {
-    alignSelf: "center",
-    marginTop: 6,
-    width: 28,
-    height: 3,
-    borderRadius: 2,
-  },
-  resumeBannerText: {
-    flex: 1,
-    fontSize: 13,
-  },
-  shareQuoteBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginHorizontal: 16,
-    marginBottom: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 10,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  shareQuoteBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 7,
-  },
-  shareQuoteBtnText: {
-    color: "#ffffff",
-    fontSize: 13,
-  },
-  shareQuoteTooLong: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 4,
-    paddingVertical: 6,
-  },
-  shareQuoteTooLongText: {
-    fontSize: 12,
-    flexShrink: 1,
-  },
-  shareQuotePreview: {
-    flex: 1,
-    fontSize: 12,
-    fontStyle: "italic",
-  },
-  copyToast: {
-    position: "absolute",
-    bottom: 90,
-    alignSelf: "center",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: "rgba(30,30,30,0.88)",
-    paddingVertical: 9,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    shadowColor: "#000",
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 6,
-  },
-  copyToastText: {
-    color: "#ffffff",
-    fontSize: 13,
-  },
-});
