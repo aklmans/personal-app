@@ -11,6 +11,12 @@ import {
   parseRssFeed,
   slugify,
 } from "../lib/feed-parser";
+import {
+  SITE_BASE,
+  extractSitemapLocs,
+  filterSitemapPostUrls,
+  filterSitemapUrlsByLocale,
+} from "../lib/feed-sitemap";
 
 const router = Router();
 
@@ -20,7 +26,6 @@ const RSS_FEEDS: Record<string, string> = {
 };
 
 const SITEMAP_INDEX = "https://aklman.com/sitemap-index.xml";
-const SITE_BASE = "https://aklman.com";
 
 // __dirname at runtime is <repo>/apps/api/dist (esbuild output).
 // Two levels up lands at <repo>/apps/api/data/cache — the persistent store.
@@ -295,7 +300,7 @@ async function fetchSitemapPostUrls(locale: string): Promise<string[]> {
     if (!indexRes.ok) return [];
 
     const indexXml = await indexRes.text();
-    const sitemapUrls = [...indexXml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1].trim());
+    const sitemapUrls = extractSitemapLocs(indexXml);
 
     const allPostUrls: string[] = [];
 
@@ -308,9 +313,7 @@ async function fetchSitemapPostUrls(locale: string): Promise<string[]> {
           });
           if (!res.ok) return;
           const xml = await res.text();
-          const urls = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)]
-            .map((m) => m[1].trim())
-            .filter((u) => u.match(/\/posts\/[^/]+\/[^/]+\/?$/) || u.match(/\/posts\/[^/]+\/?$/) && !u.endsWith("/posts/"));
+          const urls = filterSitemapPostUrls(extractSitemapLocs(xml));
           allPostUrls.push(...urls);
         } catch {
           // ignore
@@ -323,13 +326,6 @@ async function fetchSitemapPostUrls(locale: string): Promise<string[]> {
   } catch {
     return _sitemapCache ? filterSitemapUrlsByLocale(_sitemapCache.urls, locale) : [];
   }
-}
-
-function filterSitemapUrlsByLocale(urls: string[], locale: string): string[] {
-  if (locale === "zh-cn") {
-    return urls.filter((u) => u.includes(`${SITE_BASE}/zh-cn/`));
-  }
-  return urls.filter((u) => !u.includes(`${SITE_BASE}/zh-cn/`));
 }
 
 async function loadMetadataDiskCache(): Promise<void> {
