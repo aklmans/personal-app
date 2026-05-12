@@ -10,8 +10,6 @@ import {
   ActivityIndicator,
   PanResponder,
   Platform,
-  Pressable,
-  ScrollView,
   Share,
   Text,
   View,
@@ -35,11 +33,15 @@ import {
   resolveLinkColor,
   resolveThemeColors,
 } from "@/features/post-detail/postHtml";
+import { CopyToast } from "@/features/post-detail/CopyToast";
+import { OpenOnSiteFooter } from "@/features/post-detail/OpenOnSiteFooter";
 import { styles } from "@/features/post-detail/postDetail.styles";
 import { PostHeaderActions } from "@/features/post-detail/PostHeaderActions";
 import { PostHeaderTitle } from "@/features/post-detail/PostHeaderTitle";
+import { PostMetaSection } from "@/features/post-detail/PostMetaSection";
 import { QuoteShareBar } from "@/features/post-detail/QuoteShareBar";
 import { ReadingPrefsSheet } from "@/features/post-detail/ReadingPrefsSheet";
+import { ResumeReadingBanner } from "@/features/post-detail/ResumeReadingBanner";
 import {
   SCROLL_KEY_PREFIX,
   SWIPE_HINT_KEY,
@@ -780,106 +782,28 @@ export default function PostDetailScreen() {
         <View style={[styles.webview, { backgroundColor: themeColors.bg }]} />
       )}
 
-      {(tags.length > 0 || related.length > 0) && (
-        <View
-          style={[
-            styles.metaSection,
-            { backgroundColor: themeColors.bg, borderTopColor: colors.border },
-          ]}
-        >
-          {tags.length > 0 && (
-            <View style={styles.tagsRow}>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.tagsScroll}
-              >
-                {tags.map((tag) => (
-                  <Pressable
-                    key={tag}
-                    onPress={() =>
-                      router.push({
-                        pathname: "/tag/[slug]",
-                        params: {
-                          slug: tag.toLowerCase().replace(/\s+/g, "-"),
-                          locale: safeLocale,
-                        },
-                      })
-                    }
-                    style={[
-                      styles.tagChip,
-                      { backgroundColor: colors.secondary, borderColor: colors.border },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.tagChipText,
-                        { color: colors.primary, fontFamily: fonts.sans.medium },
-                      ]}
-                    >
-                      #{tag}
-                    </Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-            </View>
-          )}
-
-          {related.length > 0 && (
-            <View style={[styles.relatedSection, { borderTopColor: colors.border }]}>
-              <Text
-                style={[
-                  styles.relatedLabel,
-                  { color: colors.mutedForeground, fontFamily: fonts.sans.semiBold },
-                ]}
-              >
-                {isZh ? "相关文章" : "RELATED POSTS"}
-              </Text>
-              {related.map((rp) => (
-                <Pressable
-                  key={rp.slug}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/post/[slug]",
-                      params: { slug: rp.slug, locale: safeLocale },
-                    })
-                  }
-                  style={({ pressed }) => [
-                    styles.relatedRow,
-                    {
-                      backgroundColor: pressed ? colors.secondary : colors.card,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                >
-                  <View style={styles.relatedContent}>
-                    <Text
-                      style={[
-                        styles.relatedTitle,
-                        { color: colors.text, fontFamily: fonts.serif.regular },
-                      ]}
-                      numberOfLines={2}
-                    >
-                      {rp.title}
-                    </Text>
-                    {rp.categories.length > 0 && (
-                      <Text
-                        style={[
-                          styles.relatedCat,
-                          { color: colors.primary, fontFamily: fonts.sans.regular },
-                        ]}
-                      >
-                        {rp.categories[0]}
-                      </Text>
-                    )}
-                  </View>
-                  <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
-                </Pressable>
-              ))}
-            </View>
-          )}
-        </View>
-      )}
+      <PostMetaSection
+        tags={tags}
+        related={related}
+        colors={colors}
+        themeBg={themeColors.bg}
+        isZh={isZh}
+        onTagPress={(tag) =>
+          router.push({
+            pathname: "/tag/[slug]",
+            params: {
+              slug: tag.toLowerCase().replace(/\s+/g, "-"),
+              locale: safeLocale,
+            },
+          })
+        }
+        onRelatedPress={(relatedSlug) =>
+          router.push({
+            pathname: "/post/[slug]",
+            params: { slug: relatedSlug, locale: safeLocale },
+          })
+        }
+      />
 
       {selectedQuote.length > 0 && (
         <QuoteShareBar
@@ -893,82 +817,28 @@ export default function PostDetailScreen() {
       )}
 
       {bannerVisible && Platform.OS !== "web" && (
-        <Animated.View
-          {...bannerPanResponder.panHandlers}
-          style={[
-            styles.resumeBanner,
-            {
-              backgroundColor: themeColors.bg,
-              borderColor: `${themeColors.text}30`,
-              marginHorizontal: 16,
-              marginBottom: 8,
-              opacity: bannerAnim,
-              transform: [
-                { translateX: bannerSwipeDx },
-                {
-                  translateY: Animated.add(
-                    bannerAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [60, 0],
-                    }),
-                    bannerSwipeDy,
-                  ),
-                },
-              ],
-            },
-          ]}
-        >
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <Pressable
-              onPress={handleResumeTap}
-              accessibilityRole="button"
-              accessibilityLabel={isZh ? "从上次阅读处继续" : "Resume from where you left off"}
-              style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", flex: 1, opacity: pressed ? 0.75 : 1 })}
-            >
-              <Feather name="bookmark" size={14} color={themeColors.text} style={{ marginRight: 6 }} />
-              <Text style={[styles.resumeBannerText, { fontFamily: fonts.sans.semiBold, color: themeColors.text }]}>
-                {isZh ? "从上次阅读处继续" : "Resume from where you left off"}
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={dismissBanner}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              accessibilityRole="button"
-              accessibilityLabel={isZh ? "关闭" : "Dismiss"}
-              style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, marginLeft: 8 })}
-            >
-              <Feather name="x" size={14} color={`${themeColors.text}CC`} />
-            </Pressable>
-          </View>
-          {showSwipeHint && (
-            <Animated.View style={[styles.swipeHintHandle, { backgroundColor: `${themeColors.text}30`, opacity: swipeHintAnim }]} />
-          )}
-        </Animated.View>
+        <ResumeReadingBanner
+          panHandlers={bannerPanResponder.panHandlers}
+          themeColors={themeColors}
+          bannerAnim={bannerAnim}
+          bannerSwipeDx={bannerSwipeDx}
+          bannerSwipeDy={bannerSwipeDy}
+          showSwipeHint={showSwipeHint}
+          swipeHintAnim={swipeHintAnim}
+          isZh={isZh}
+          onResume={handleResumeTap}
+          onDismiss={dismissBanner}
+        />
       )}
 
-      <View
-        style={[
-          styles.footer,
-          {
-            paddingBottom: bottomPad,
-            backgroundColor: themeColors.bg,
-            borderTopColor: colors.border,
-          },
-        ]}
-      >
-        <Pressable
-          onPress={openInBrowser}
-          style={({ pressed }) => [
-            styles.openBtn,
-            { backgroundColor: pressed ? "#c05540" : colors.primary },
-          ]}
-        >
-          <Text style={[styles.openBtnText, { fontFamily: fonts.sans.semiBold }]}>
-            {isZh ? "在 aklman.com 上阅读" : "Open on aklman.com"}
-          </Text>
-          <Feather name="external-link" size={15} color="#ffffff" />
-        </Pressable>
-      </View>
+      <OpenOnSiteFooter
+        bottomPad={bottomPad}
+        backgroundColor={themeColors.bg}
+        borderColor={colors.border}
+        primaryColor={colors.primary}
+        isZh={isZh}
+        onOpen={openInBrowser}
+      />
 
       <ReadingPrefsSheet
         visible={sheetVisible}
@@ -986,20 +856,12 @@ export default function PostDetailScreen() {
         isZh={isZh}
       />
 
-      {copyToastVisible && (
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.copyToast,
-            { opacity: copyToastAnim, transform: [{ translateY: copyToastAnim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }] },
-          ]}
-        >
-          <Feather name="check" size={14} color="#ffffff" />
-          <Text style={[styles.copyToastText, { fontFamily: fonts.sans.semiBold }]}>
-            {copyToastMessage || (isZh ? "链接已复制" : "Link copied")}
-          </Text>
-        </Animated.View>
-      )}
+      <CopyToast
+        visible={copyToastVisible}
+        anim={copyToastAnim}
+        message={copyToastMessage}
+        isZh={isZh}
+      />
     </View>
   );
 }
