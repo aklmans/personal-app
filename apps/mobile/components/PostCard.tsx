@@ -1,5 +1,5 @@
 import { Feather } from "@expo/vector-icons";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   Image,
@@ -50,9 +50,15 @@ export function PostCard({ post, onPress }: PostCardProps) {
   const { isBookmarked, toggleBookmark } = useBookmarks();
   const { hasRead } = useHistory();
   const { optedIn, mutedSlugs, mutePost } = useNotifications();
+  const [imageFailed, setImageFailed] = useState(false);
   const bookmarked = isBookmarked(post.slug, post.locale);
   const read = hasRead(post.slug, post.locale);
   const muted = mutedSlugs.includes(post.slug);
+  const coverImageUri = imageFailed ? null : post.coverImage;
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [post.coverImage]);
 
   const handleLongPress = () => {
     if (!optedIn) return;
@@ -90,15 +96,16 @@ export function PostCard({ post, onPress }: PostCardProps) {
       ]}
     >
       {read && (
-        <View style={[styles.readBadge, { backgroundColor: colors.muted }]} pointerEvents="none">
-          <Feather name="check" size={10} color={colors.mutedForeground} />
+        <View style={[styles.readBadge, { backgroundColor: colors.primary }]} pointerEvents="none">
+          <Feather name="check" size={13} color={colors.primaryForeground} />
         </View>
       )}
-      {post.coverImage ? (
+      {coverImageUri ? (
         <Image
-          source={{ uri: post.coverImage }}
+          source={{ uri: coverImageUri }}
           style={styles.image}
           resizeMode="cover"
+          onError={() => setImageFailed(true)}
         />
       ) : (
         <View style={[styles.imagePlaceholder, { backgroundColor: colors.muted }]}>
@@ -170,14 +177,14 @@ export function PostCard({ post, onPress }: PostCardProps) {
               e.stopPropagation();
               toggleBookmark(post);
             }}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             style={({ pressed }) => [styles.bookmarkBtn, { opacity: pressed ? 0.5 : 1 }]}
             accessibilityLabel={bookmarked ? "Remove bookmark" : "Bookmark article"}
             accessibilityRole="button"
           >
             <Feather
               name="bookmark"
-              size={16}
+              size={20}
               color={bookmarked ? colors.primary : colors.mutedForeground}
             />
           </Pressable>
@@ -231,12 +238,18 @@ const styles = StyleSheet.create({
   metaLeft: {
     flexDirection: "row",
     alignItems: "center",
+    flex: 1,
+    flexWrap: "wrap",
   },
   metaText: {
     fontSize: 12,
   },
   bookmarkBtn: {
-    padding: 2,
+    width: 36,
+    height: 36,
+    marginLeft: 8,
+    alignItems: "center",
+    justifyContent: "center",
   },
   stalePill: {
     marginLeft: 6,
@@ -253,9 +266,9 @@ const styles = StyleSheet.create({
     top: 8,
     right: 8,
     zIndex: 1,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
   },
