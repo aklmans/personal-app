@@ -21,6 +21,7 @@ import { PostCard } from "@/components/PostCard";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { fonts } from "@/constants/fonts";
 import { getTabScreenBottomPadding } from "@/constants/layout";
+import { resolvePostCoverImageUri } from "@/constants/postCover";
 import { useHistory } from "@/context/HistoryContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { usePaginatedPosts } from "@/hooks/usePaginatedPosts";
@@ -168,17 +169,11 @@ export default function HomeScreen() {
                       },
                     ]}
                   >
-                    {item.coverImage ? (
-                      <Image
-                        source={{ uri: item.coverImage }}
-                        style={styles.continueCover}
-                        resizeMode="cover"
-                      />
-                    ) : (
-                      <View
-                        style={[styles.continueCover, { backgroundColor: colors.muted }]}
-                      />
-                    )}
+                    <Image
+                      source={{ uri: resolvePostCoverImageUri(item.coverImage) }}
+                      style={[styles.continueCover, { backgroundColor: colors.muted }]}
+                      resizeMode="cover"
+                    />
                     <View style={styles.continueCardBody}>
                       <Text
                         style={[
