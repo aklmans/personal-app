@@ -452,7 +452,7 @@ export default function PostDetailScreen() {
         ? "'Inter', system-ui, sans-serif"
         : "'Lora', Georgia, 'Times New Roman', serif";
       webViewRef.current.injectJavaScript(
-        `document.body.style.fontFamily='${fontStack}';true;`
+        `document.body.style.fontFamily=${JSON.stringify(fontStack)};true;`
       );
     }
   }, [fontFamily]);
