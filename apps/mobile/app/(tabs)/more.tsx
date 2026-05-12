@@ -4,62 +4,29 @@ import * as WebBrowser from "expo-web-browser";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Animated,
-  Image,
   Platform,
   Pressable,
   ScrollView,
-  StyleProp,
   StyleSheet,
   Switch,
   Text,
-  TextInput,
-  TextStyle,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect, useRouter } from "expo-router";
 
-import HighlightedTitle from "@/components/HighlightedTitle";
 import { useCopyToast } from "@/hooks/useCopyToast";
 import { fonts } from "@/constants/fonts";
 import { useBookmarks } from "@/context/BookmarksContext";
-import { useHistory, type HistoryEntry } from "@/context/HistoryContext";
+import { useHistory } from "@/context/HistoryContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useNotifications } from "@/context/NotificationsContext";
 import { useTheme, type ThemePreference } from "@/context/ThemeContext";
+import { BookmarksSection } from "@/features/more/BookmarksSection";
+import { ReadingStatsSection } from "@/features/more/ReadingStatsSection";
+import { RecentHistorySection } from "@/features/more/RecentHistorySection";
+import type { SortOrder } from "@/features/more/types";
 import { useColors } from "@/hooks/useColors";
-
-function formatVisitedAt(iso: string): string {
-  const date = new Date(iso);
-  const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const yesterdayStart = new Date(todayStart.getTime() - 86400000);
-  const dateStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  if (dateStart.getTime() === todayStart.getTime()) return "Today";
-  if (dateStart.getTime() === yesterdayStart.getTime()) return "Yesterday";
-  const sameYear = date.getFullYear() === now.getFullYear();
-  return date.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    ...(sameYear ? {} : { year: "numeric" }),
-  });
-}
-
-function formatVisitedAtZh(iso: string): string {
-  const date = new Date(iso);
-  const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const yesterdayStart = new Date(todayStart.getTime() - 86400000);
-  const dateStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  if (dateStart.getTime() === todayStart.getTime()) return "今天";
-  if (dateStart.getTime() === yesterdayStart.getTime()) return "昨天";
-  const sameYear = date.getFullYear() === now.getFullYear();
-  return date.toLocaleDateString("zh-CN", {
-    month: "long",
-    day: "numeric",
-    ...(sameYear ? {} : { year: "numeric" }),
-  });
-}
 
 interface NavItem {
   icon: keyof typeof Feather.glyphMap;
@@ -73,8 +40,6 @@ const THEME_OPTIONS: { value: ThemePreference; label: string; labelZh: string; i
   { value: "dark", label: "Dark", labelZh: "深色", icon: "moon" },
   { value: "system", label: "System", labelZh: "跟随系统", icon: "smartphone" },
 ];
-
-type SortOrder = "newest" | "oldest";
 
 export default function MoreScreen() {
   const colors = useColors();
@@ -301,394 +266,44 @@ export default function MoreScreen() {
         </Text>
       </View>
 
-      <View style={[styles.section, { marginTop: 24 }]}>
-        <View style={styles.sectionHeader}>
-          <Text
-            style={[
-              styles.sectionLabel,
-              { color: colors.mutedForeground, fontFamily: fonts.sans.semiBold },
-            ]}
-          >
-            {isZh ? "书签" : "BOOKMARKS"}
-          </Text>
-          {bookmarks.length > 0 && (
-            <View style={styles.sortToggle}>
-              <Pressable
-                onPress={() => handleSetBookmarkSort("newest")}
-                style={[
-                  styles.sortBtn,
-                  {
-                    backgroundColor: bookmarkSort === "newest" ? colors.primary : colors.secondary,
-                    borderColor: bookmarkSort === "newest" ? colors.primary : colors.border,
-                  },
-                ]}
-                accessibilityLabel={isZh ? "最新" : "Newest first"}
-                accessibilityRole="button"
-              >
-                <Text
-                  style={[
-                    styles.sortBtnLabel,
-                    {
-                      color: bookmarkSort === "newest" ? "#ffffff" : colors.mutedForeground,
-                      fontFamily: fonts.sans.medium,
-                    },
-                  ]}
-                >
-                  {isZh ? "最新" : "Newest"}
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => handleSetBookmarkSort("oldest")}
-                style={[
-                  styles.sortBtn,
-                  {
-                    backgroundColor: bookmarkSort === "oldest" ? colors.primary : colors.secondary,
-                    borderColor: bookmarkSort === "oldest" ? colors.primary : colors.border,
-                  },
-                ]}
-                accessibilityLabel={isZh ? "最早" : "Oldest first"}
-                accessibilityRole="button"
-              >
-                <Text
-                  style={[
-                    styles.sortBtnLabel,
-                    {
-                      color: bookmarkSort === "oldest" ? "#ffffff" : colors.mutedForeground,
-                      fontFamily: fonts.sans.medium,
-                    },
-                  ]}
-                >
-                  {isZh ? "最早" : "Oldest"}
-                </Text>
-              </Pressable>
-            </View>
-          )}
-        </View>
-
-        {bookmarks.length > 0 && bookmarkCategories.length > 0 && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.chipScroll}
-            contentContainerStyle={styles.chipRow}
-          >
-            <Pressable
-              onPress={() => handleSetActiveCategory(null)}
-              style={[
-                styles.chip,
-                {
-                  backgroundColor: activeCategory === null ? colors.primary : colors.secondary,
-                  borderColor: activeCategory === null ? colors.primary : colors.border,
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.chipLabel,
-                  {
-                    color: activeCategory === null ? "#ffffff" : colors.mutedForeground,
-                    fontFamily: fonts.sans.medium,
-                  },
-                ]}
-              >
-                {isZh ? "全部" : "All"}
-              </Text>
-            </Pressable>
-            {bookmarkCategories.map((cat) => (
-              <Pressable
-                key={cat}
-                onPress={() => handleSetActiveCategory(activeCategory === cat ? null : cat)}
-                style={[
-                  styles.chip,
-                  {
-                    backgroundColor: activeCategory === cat ? colors.primary : colors.secondary,
-                    borderColor: activeCategory === cat ? colors.primary : colors.border,
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.chipLabel,
-                    {
-                      color: activeCategory === cat ? "#ffffff" : colors.mutedForeground,
-                      fontFamily: fonts.sans.medium,
-                    },
-                  ]}
-                >
-                  {cat}
-                </Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-        )}
-
-        {bookmarks.length > 0 && (
-          <View style={[styles.searchRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Feather name="search" size={15} color={colors.mutedForeground} style={styles.searchIcon} />
-            <TextInput
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder={isZh ? "搜索书签…" : "Search bookmarks…"}
-              placeholderTextColor={colors.mutedForeground}
-              style={[styles.searchInput, { color: colors.text, fontFamily: fonts.sans.regular }]}
-              returnKeyType="search"
-              clearButtonMode="while-editing"
-              autoCorrect={false}
-              autoCapitalize="none"
-            />
-            {searchQuery.length > 0 && Platform.OS !== "ios" && (
-              <Pressable onPress={() => setSearchQuery("")} hitSlop={8}>
-                <Feather name="x" size={15} color={colors.mutedForeground} />
-              </Pressable>
-            )}
-          </View>
-        )}
-
-        {bookmarks.length === 0 ? (
-          <View style={[styles.emptyBookmarks, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Feather name="bookmark" size={22} color={colors.mutedForeground} />
-            <Text style={[styles.emptyBookmarksText, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}>
-              {isZh ? "尚无书签。在文章页面点击书签图标即可保存。" : "No bookmarks yet. Tap the bookmark icon on any article to save it."}
-            </Text>
-          </View>
-        ) : displayedBookmarks.length === 0 ? (
-          <View style={[styles.emptyBookmarks, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Feather name={searchQuery.trim() ? "search" : "filter"} size={22} color={colors.mutedForeground} />
-            <Text style={[styles.emptyBookmarksText, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}>
-              {searchQuery.trim()
-                ? (isZh ? "没有符合的书签。" : "No bookmarks match your search.")
-                : (isZh ? "此分类下暂无书签。" : "No bookmarks in this category.")}
-            </Text>
-          </View>
-        ) : (
-          displayedBookmarks.map((post) => (
-            <Pressable
-              key={`${post.locale}:${post.slug}`}
-              onPress={() =>
-                router.push({
-                  pathname: "/post/[slug]",
-                  params: { slug: post.slug, locale: post.locale },
-                })
-              }
-              style={({ pressed }) => [
-                styles.bookmarkRow,
-                {
-                  backgroundColor: pressed ? colors.secondary : colors.card,
-                  borderColor: colors.border,
-                },
-              ]}
-            >
-              {post.coverImage ? (
-                <Image
-                  source={{ uri: post.coverImage }}
-                  style={[styles.bookmarkThumb, { backgroundColor: colors.muted }]}
-                  resizeMode="cover"
-                />
-              ) : (
-                <View style={[styles.bookmarkThumb, styles.bookmarkThumbPlaceholder, { backgroundColor: colors.muted }]}>
-                  <Feather name="book-open" size={16} color={colors.mutedForeground} />
-                </View>
-              )}
-              <View style={styles.bookmarkContent}>
-                <HighlightedTitle
-                  text={post.title}
-                  query={searchQuery}
-                  style={[styles.bookmarkTitle, { color: colors.text, fontFamily: fonts.serif.semiBold }]}
-                  highlightColor={colors.primary}
-                  numberOfLines={2}
-                />
-                {post.categories.length > 0 && (
-                  <Text style={[styles.bookmarkMeta, { color: colors.primary, fontFamily: fonts.sans.regular }]}>
-                    {post.categories[0]}
-                  </Text>
-                )}
-              </View>
-              <Pressable
-                onPress={(e) => {
-                  e.stopPropagation();
-                  toggleBookmark(post);
-                }}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                style={({ pressed }) => ({ opacity: pressed ? 0.4 : 1, padding: 4 })}
-                accessibilityLabel="Remove bookmark"
-                accessibilityRole="button"
-              >
-                <Feather name="x" size={16} color={colors.mutedForeground} />
-              </Pressable>
-            </Pressable>
-          ))
-        )}
-      </View>
+      <BookmarksSection
+        activeCategory={activeCategory}
+        bookmarkCategories={bookmarkCategories}
+        bookmarkSort={bookmarkSort}
+        bookmarks={bookmarks}
+        displayedBookmarks={displayedBookmarks}
+        isZh={isZh}
+        onOpenPost={(post) =>
+          router.push({
+            pathname: "/post/[slug]",
+            params: { slug: post.slug, locale: post.locale },
+          })
+        }
+        onSearchQueryChange={setSearchQuery}
+        onSetActiveCategory={handleSetActiveCategory}
+        onSetBookmarkSort={handleSetBookmarkSort}
+        onToggleBookmark={toggleBookmark}
+        searchQuery={searchQuery}
+      />
 
       {readingStats.totalArticles > 0 && (
-        <View style={[styles.section, { marginTop: 24 }]}>
-          <Text
-            style={[
-              styles.sectionLabel,
-              { color: colors.mutedForeground, fontFamily: fonts.sans.semiBold },
-            ]}
-          >
-            {isZh ? "阅读统计" : "READING STATS"}
-          </Text>
-          <View style={[styles.statsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={[styles.statItem, { borderRightColor: colors.border }]}>
-              <View style={[styles.statIconWrap, { backgroundColor: colors.secondary }]}>
-                <Feather name="book-open" size={18} color={colors.primary} />
-              </View>
-              <Text style={[styles.statValue, { color: colors.text, fontFamily: fonts.serif.bold }]}>
-                {readingStats.totalArticles}
-              </Text>
-              <Text style={[styles.statLabel, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}>
-                {isZh ? "已读文章" : "Articles Read"}
-              </Text>
-            </View>
-            <View style={[styles.statItem, { borderRightColor: colors.border }]}>
-              <View style={[styles.statIconWrap, { backgroundColor: colors.secondary }]}>
-                <Feather name="clock" size={18} color={colors.primary} />
-              </View>
-              <Text style={[styles.statValue, { color: colors.text, fontFamily: fonts.serif.bold }]}>
-                {readingStats.totalMinutes > 0 ? `${readingStats.totalMinutes}` : "—"}
-              </Text>
-              <Text style={[styles.statLabel, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}>
-                {isZh ? "预计分钟" : "Est. Minutes"}
-              </Text>
-            </View>
-            <View style={[styles.statItem, { borderRightWidth: 0 }]}>
-              <View style={[styles.statIconWrap, { backgroundColor: colors.secondary }]}>
-                <Feather name="tag" size={18} color={colors.primary} />
-              </View>
-              <Text
-                style={[styles.statValue, { color: colors.text, fontFamily: fonts.serif.bold, fontSize: readingStats.topCategories.length > 0 && readingStats.topCategories[0].length > 8 ? 16 : 26 }]}
-                numberOfLines={2}
-                adjustsFontSizeToFit
-              >
-                {readingStats.topCategories.length > 0 ? readingStats.topCategories.join(" · ") : "—"}
-              </Text>
-              <Text style={[styles.statLabel, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}>
-                {isZh ? "最多分类" : readingStats.topCategories.length > 1 ? "Top Categories" : "Top Category"}
-              </Text>
-            </View>
-          </View>
-          <Text style={[styles.statsResetHint, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}>
-            {isZh ? "清除阅读记录即可重置统计数据" : "Clear reading history to reset stats"}
-          </Text>
-        </View>
+        <ReadingStatsSection isZh={isZh} readingStats={readingStats} />
       )}
 
-      <View style={[styles.section, { marginTop: 24 }]}>
-        <View style={styles.sectionHeader}>
-          <Text
-            style={[
-              styles.sectionLabel,
-              { color: colors.mutedForeground, fontFamily: fonts.sans.semiBold },
-            ]}
-          >
-            {isZh ? "最近阅读" : "RECENTLY READ"}
-          </Text>
-          {history.length > 0 && (
-            <Pressable
-              onPress={clearHistory}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
-            >
-              <Text style={[styles.clearBtn, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}>
-                {isZh ? "清除记录与统计" : "Clear history & stats"}
-              </Text>
-            </Pressable>
-          )}
-        </View>
-        {history.length > 0 && (
-          <View style={[styles.searchRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Feather name="search" size={15} color={colors.mutedForeground} style={styles.searchIcon} />
-            <TextInput
-              value={historyQuery}
-              onChangeText={setHistoryQuery}
-              placeholder={isZh ? "搜索历史记录…" : "Search history…"}
-              placeholderTextColor={colors.mutedForeground}
-              style={[styles.searchInput, { color: colors.text, fontFamily: fonts.sans.regular }]}
-              returnKeyType="search"
-              clearButtonMode="while-editing"
-              autoCorrect={false}
-              autoCapitalize="none"
-            />
-            {historyQuery.length > 0 && Platform.OS !== "ios" && (
-              <Pressable onPress={() => setHistoryQuery("")} hitSlop={8}>
-                <Feather name="x" size={15} color={colors.mutedForeground} />
-              </Pressable>
-            )}
-          </View>
-        )}
-
-        {history.length === 0 ? (
-          <View style={[styles.emptyBookmarks, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Feather name="clock" size={22} color={colors.mutedForeground} />
-            <Text style={[styles.emptyBookmarksText, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}>
-              {isZh ? "尚无阅读记录。打开文章后将自动记录在这里。" : "No reading history yet. Articles you open will appear here."}
-            </Text>
-          </View>
-        ) : displayedHistory.length === 0 ? (
-          <View style={[styles.emptyBookmarks, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Feather name="search" size={22} color={colors.mutedForeground} />
-            <Text style={[styles.emptyBookmarksText, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}>
-              {isZh ? "没有符合的阅读记录。" : "No history matches your search."}
-            </Text>
-          </View>
-        ) : (
-          displayedHistory.map((entry: HistoryEntry) => (
-            <Pressable
-              key={`${entry.locale}:${entry.slug}`}
-              onPress={() =>
-                router.push({
-                  pathname: "/post/[slug]",
-                  params: { slug: entry.slug, locale: entry.locale },
-                })
-              }
-              style={({ pressed }) => [
-                styles.bookmarkRow,
-                {
-                  backgroundColor: pressed ? colors.secondary : colors.card,
-                  borderColor: colors.border,
-                },
-              ]}
-            >
-              {entry.coverImage ? (
-                <Image
-                  source={{ uri: entry.coverImage }}
-                  style={[styles.bookmarkThumb, { backgroundColor: colors.muted }]}
-                  resizeMode="cover"
-                />
-              ) : (
-                <View style={[styles.bookmarkThumb, styles.bookmarkThumbPlaceholder, { backgroundColor: colors.muted }]}>
-                  <Feather name="book-open" size={16} color={colors.mutedForeground} />
-                </View>
-              )}
-              <View style={styles.bookmarkContent}>
-                <HighlightedTitle
-                  text={entry.title}
-                  query={historyQuery}
-                  style={[styles.bookmarkTitle, { color: colors.text, fontFamily: fonts.serif.semiBold }]}
-                  highlightColor={colors.primary}
-                  numberOfLines={2}
-                />
-                <View style={styles.historyMeta}>
-                  {entry.categories.length > 0 && (
-                    <Text style={[styles.bookmarkMeta, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}>
-                      {entry.categories[0]}
-                    </Text>
-                  )}
-                  {entry.categories.length > 0 && (
-                    <Text style={[styles.historyDot, { color: colors.mutedForeground }]}>·</Text>
-                  )}
-                  <Text style={[styles.bookmarkMeta, { color: colors.mutedForeground, fontFamily: fonts.sans.regular }]}>
-                    {isZh ? formatVisitedAtZh(entry.visitedAt) : formatVisitedAt(entry.visitedAt)}
-                  </Text>
-                </View>
-              </View>
-              <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
-            </Pressable>
-          ))
-        )}
-      </View>
+      <RecentHistorySection
+        displayedHistory={displayedHistory}
+        history={history}
+        historyQuery={historyQuery}
+        isZh={isZh}
+        onClearHistory={clearHistory}
+        onHistoryQueryChange={setHistoryQuery}
+        onOpenEntry={(entry) =>
+          router.push({
+            pathname: "/post/[slug]",
+            params: { slug: entry.slug, locale: entry.locale },
+          })
+        }
+      />
 
       <View style={[styles.section, { marginTop: 24 }]}>
         <Text
@@ -1120,30 +735,6 @@ const styles = StyleSheet.create({
   footerLink: {
     fontSize: 14,
   },
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 8,
-    marginTop: 4,
-  },
-  clearBtn: {
-    fontSize: 13,
-  },
-  emptyBookmarks: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    padding: 14,
-    borderRadius: 8,
-    borderWidth: StyleSheet.hairlineWidth,
-    marginBottom: 4,
-  },
-  emptyBookmarksText: {
-    flex: 1,
-    fontSize: 13,
-    lineHeight: 18,
-  },
   notifHint: {
     fontSize: 11,
     marginTop: 2,
@@ -1165,103 +756,6 @@ const styles = StyleSheet.create({
   notifTopicsHint: {
     fontSize: 11,
   },
-  searchRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 8,
-    borderWidth: StyleSheet.hairlineWidth,
-    marginBottom: 6,
-    paddingHorizontal: 10,
-    paddingVertical: Platform.OS === "ios" ? 8 : 4,
-  },
-  searchIcon: {
-    marginRight: 7,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    paddingVertical: 0,
-  },
-  bookmarkRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    borderRadius: 8,
-    borderWidth: StyleSheet.hairlineWidth,
-    marginBottom: 4,
-    overflow: "hidden",
-    paddingRight: 10,
-  },
-  bookmarkThumb: {
-    width: 60,
-    height: 60,
-  },
-  bookmarkThumbPlaceholder: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  bookmarkContent: {
-    flex: 1,
-    paddingVertical: 8,
-  },
-  bookmarkTitle: {
-    fontSize: 14,
-    lineHeight: 19,
-    marginBottom: 3,
-  },
-  bookmarkMeta: {
-    fontSize: 12,
-  },
-  statsCard: {
-    flexDirection: "row",
-    borderRadius: 10,
-    borderWidth: StyleSheet.hairlineWidth,
-    overflow: "hidden",
-  },
-  statItem: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 16,
-    paddingHorizontal: 8,
-    gap: 6,
-    borderRightWidth: StyleSheet.hairlineWidth,
-  },
-  statIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 2,
-  },
-  statValue: {
-    fontSize: 26,
-    letterSpacing: -0.5,
-    lineHeight: 30,
-  },
-  statLabel: {
-    fontSize: 11,
-    textAlign: "center",
-    lineHeight: 15,
-  },
-  statsResetHint: {
-    fontSize: 12,
-    textAlign: "center",
-    marginTop: 8,
-  },
-  sortToggle: {
-    flexDirection: "row",
-    gap: 4,
-  },
-  sortBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  sortBtnLabel: {
-    fontSize: 12,
-  },
   chipScroll: {
     marginBottom: 8,
   },
@@ -1277,16 +771,6 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   chipLabel: {
-    fontSize: 12,
-  },
-  historyMeta: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: 4,
-    marginTop: 2,
-  },
-  historyDot: {
     fontSize: 12,
   },
   notifToast: {
