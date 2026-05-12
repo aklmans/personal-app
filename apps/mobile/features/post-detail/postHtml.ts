@@ -6,6 +6,76 @@ interface PostHtmlColors {
   mutedForeground: string;
   primary: string;
   border: string;
+  card?: string;
+  secondary?: string;
+}
+
+interface PostHtmlRelatedPost {
+  slug: string;
+  title: string;
+  categories: string[];
+}
+
+interface PostHtmlMeta {
+  tags: string[];
+  related: PostHtmlRelatedPost[];
+  postLink?: string | null;
+  isZh: boolean;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function buildPostMetaHtml(meta?: PostHtmlMeta): string {
+  if (!meta) return "";
+  const tags = meta.tags ?? [];
+  const related = meta.related ?? [];
+  const hasOpenLink = typeof meta.postLink === "string" && meta.postLink.length > 0;
+  if (tags.length === 0 && related.length === 0 && !hasOpenLink) return "";
+
+  const tagsHtml = tags.length > 0
+    ? `<section class="post-meta-tags" aria-label="${meta.isZh ? "标签" : "Tags"}">
+${tags.map((tag) => `<button class="post-meta-chip" type="button" data-post-action="tag" data-post-value="${escapeHtml(tag)}">#${escapeHtml(tag)}</button>`).join("")}
+</section>`
+    : "";
+
+  const relatedHtml = related.length > 0
+    ? `<section class="post-meta-related">
+  <h2 class="post-meta-label">${meta.isZh ? "相关文章" : "Related Posts"}</h2>
+  <div class="post-meta-related-list">
+${related.map((rp) => {
+  const category = rp.categories[0];
+  return `<button class="post-meta-related-row" type="button" data-post-action="related" data-post-value="${escapeHtml(rp.slug)}">
+    <span class="post-meta-related-copy">
+      <span class="post-meta-related-title">${escapeHtml(rp.title)}</span>
+      ${category ? `<span class="post-meta-related-category">${escapeHtml(category)}</span>` : ""}
+    </span>
+    <span class="post-meta-related-chevron" aria-hidden="true">›</span>
+  </button>`;
+}).join("")}
+  </div>
+</section>`
+    : "";
+
+  const openHtml = hasOpenLink
+    ? `<section class="post-meta-open">
+  <button class="post-meta-open-button" type="button" data-post-action="open-site">
+    ${meta.isZh ? "在 aklman.com 上阅读" : "Open on aklman.com"} <span aria-hidden="true">↗</span>
+  </button>
+</section>`
+    : "";
+
+  return `<div class="post-meta-native">
+${tagsHtml}
+${relatedHtml}
+${openHtml}
+</div>`;
 }
 
 export function resolveThemeColors(
@@ -104,18 +174,39 @@ export function buildHtml(
   contentWidth: ContentWidth = "full",
   fontFamily: FontFamily = "serif",
   colorTheme: ColorTheme = "default",
-  accentColor: string | null = null
+  accentColor: string | null = null,
+  meta?: PostHtmlMeta
 ): string {
   const { bg, text } = resolveThemeColors(colorTheme, colors.background, colors.text);
   const highlightColor = resolveHighlightColor(colorTheme, accentColor);
   const primary = resolveLinkColor(colorTheme, accentColor, colors.primary);
-  const muted = colors.mutedForeground;
-  const codeBg = isDark ? "#2e2825" : "#ede8e0";
-  const border = colors.border;
+  const effectiveDark = colorTheme === "high-contrast" || (colorTheme === "default" && isDark);
+  const muted = colorTheme === "sepia"
+    ? "#6d5a4c"
+    : colorTheme === "high-contrast"
+      ? "#d7d7d7"
+      : colors.mutedForeground;
+  const codeBg = colorTheme === "sepia" ? "#ede8e0" : effectiveDark ? "#2e2825" : "#ede8e0";
+  const border = colorTheme === "sepia"
+    ? "rgba(59,35,20,0.14)"
+    : colorTheme === "high-contrast"
+      ? "rgba(255,255,255,0.26)"
+      : colors.border;
+  const card = colorTheme === "sepia"
+    ? "#fffaf5"
+    : colorTheme === "high-contrast"
+      ? "#111111"
+      : colors.card ?? (isDark ? "#241f1c" : "#fffaf5");
+  const secondary = colorTheme === "sepia"
+    ? "#ede8e0"
+    : colorTheme === "high-contrast"
+      ? "#1b1b1b"
+      : colors.secondary ?? codeBg;
   const bodyMaxWidth = contentWidth === "narrow" ? "680px" : "100%";
   const padH = contentWidth === "narrow" ? "24px" : "20px";
+  const postMetaHtml = buildPostMetaHtml(meta);
 
-  const prismCssUrl = isDark
+  const prismCssUrl = effectiveDark
     ? "https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css"
     : "https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism.min.css";
 
@@ -439,12 +530,104 @@ export function buildHtml(
     em { font-style: italic; }
     mark { background: rgba(218,119,86,0.18); padding: 1px 3px; border-radius: 3px; }
     sup, sub { font-size: 0.75em; }
+    .post-meta-native {
+      margin-top: 2.4em;
+      padding-top: 0.85em;
+      border-top: 1px solid ${border};
+      font-family: 'Inter', system-ui, sans-serif;
+    }
+    .post-meta-tags {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 0.3em 0 0.9em;
+      margin: 0;
+      -webkit-overflow-scrolling: touch;
+    }
+    .post-meta-chip {
+      flex: 0 0 auto;
+      appearance: none;
+      border: 1px solid ${border};
+      border-radius: 999px;
+      background: ${secondary};
+      color: ${primary};
+      font: 500 0.82rem/1.2 'Inter', system-ui, sans-serif;
+      padding: 0.48em 0.78em;
+    }
+    .post-meta-related {
+      border-top: 1px solid ${border};
+      padding-top: 1em;
+      margin-top: 0.2em;
+    }
+    .post-meta-label {
+      border: 0;
+      color: ${muted};
+      font: 700 0.72rem/1.2 'Inter', system-ui, sans-serif;
+      letter-spacing: 0.12em;
+      margin: 0 0 0.8em;
+      padding: 0;
+      text-transform: uppercase;
+    }
+    .post-meta-related-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.55em;
+    }
+    .post-meta-related-row {
+      width: 100%;
+      appearance: none;
+      border: 1px solid ${border};
+      border-radius: 10px;
+      background: ${card};
+      color: ${text};
+      display: flex;
+      align-items: center;
+      gap: 0.8em;
+      padding: 0.85em 0.95em;
+      text-align: left;
+    }
+    .post-meta-related-copy {
+      min-width: 0;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25em;
+    }
+    .post-meta-related-title {
+      color: ${text};
+      font-family: ${fontFamily === "sans" ? "'Inter', system-ui, sans-serif" : "'Lora', Georgia, serif"};
+      font-size: 0.96rem;
+      line-height: 1.35;
+    }
+    .post-meta-related-category {
+      color: ${primary};
+      font: 400 0.82rem/1.2 'Inter', system-ui, sans-serif;
+    }
+    .post-meta-related-chevron {
+      color: ${muted};
+      font-size: 1.65rem;
+      line-height: 1;
+    }
+    .post-meta-open {
+      padding: 1.5em 0 0;
+    }
+    .post-meta-open-button {
+      width: 100%;
+      appearance: none;
+      border: 0;
+      border-radius: 10px;
+      background: ${primary};
+      color: #ffffff;
+      font: 700 0.95rem/1.2 'Inter', system-ui, sans-serif;
+      padding: 0.95em 1em;
+    }
   </style>
 </head>
-<body>${content || "<p>No content available for this article. Tap the button below to read it in full.</p>"}
+<body>${content || "<p>No content available for this article. Tap the button below to read it in full.</p>"}${postMetaHtml}
 <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js" data-manual></script>
 <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
 <script>${highlightScript}</script>
+<script>(function(){function post(d){var msg=JSON.stringify(d);if(window.ReactNativeWebView){window.ReactNativeWebView.postMessage(msg);}if(window.parent&&window.parent!==window){window.parent.postMessage(msg,'*');}}document.addEventListener('click',function(e){var el=e.target&&e.target.closest?e.target.closest('[data-post-action]'):null;if(!el)return;var action=el.getAttribute('data-post-action');var value=el.getAttribute('data-post-value')||'';post({t:action,value:value});});})()</script>
 <script>(function(){var selTimer;document.addEventListener('selectionchange',function(){clearTimeout(selTimer);selTimer=setTimeout(function(){var sel=window.getSelection?window.getSelection().toString().trim():'';window.parent.postMessage(JSON.stringify({t:'selection',text:sel}),'*');},300);});})()</script>
 <script>(function(){window.addEventListener('message',function(e){if(e.source!==window.parent)return;try{var d=JSON.parse(e.data);}catch(err){return;}if(d.t!=='highlight')return;var hc=getComputedStyle(document.documentElement).getPropertyValue('--highlight-color').trim()||'rgba(218,119,86,0.35)';var tbg=getComputedStyle(document.documentElement).getPropertyValue('--theme-bg').trim()||'transparent';var sel=window.getSelection();if(!sel||sel.rangeCount===0)return;var range=sel.getRangeAt(0);var mark=document.createElement('span');mark.style.cssText='background:'+hc+';border-radius:2px;transition:background 1.5s ease-out';try{var frag=range.extractContents();mark.appendChild(frag);range.insertNode(mark);sel.removeAllRanges();setTimeout(function(){mark.style.background=tbg;setTimeout(function(){var p=mark.parentNode;if(p){while(mark.firstChild)p.insertBefore(mark.firstChild,mark);p.removeChild(mark);}},1500);},50);}catch(err){document.body.style.transition='background 0.3s ease';document.body.style.background=hc;setTimeout(function(){document.body.style.background=tbg;},700);}});})()</script>
 </body>
