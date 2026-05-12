@@ -7,7 +7,8 @@ import type { BlogPost, CacheEntry } from "./feed-types";
 import { logger } from "./logger";
 
 // __dirname at runtime is <repo>/apps/api/dist (esbuild output).
-// Two levels up lands at <repo>/apps/api/data/cache — the persistent store.
+// Two levels up is <repo>/apps, so this resolves to <repo>/apps/data/cache —
+// the persistent store. (Top-level apps/data/, not apps/api/data/.)
 const DISK_CACHE_DIR = path.resolve(__dirname, "../../data/cache");
 
 function diskCachePath(locale: string): string {

@@ -60,6 +60,6 @@ Mobile (Expo public, baked into bundle):
 ## Notes
 
 - The bottom Liquid Glass tab bar reads from `UITraitCollection`, not RN `Appearance`. Theme picker calls `Appearance.setColorScheme` to sync them — see `apps/mobile/context/ThemeContext.tsx`.
-- `apps/api/data/cache/` is local RSS cache, gitignored.
+- `apps/data/cache/` is local RSS cache, gitignored.
 - Three pages (`about`, `showcases`, post detail) render content from aklman.com via WebView rather than native RN.
 
