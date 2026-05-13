@@ -31,6 +31,7 @@ import {
   filterSitemapUrlsByLocale,
 } from "./feed-sitemap";
 import type { BlogPost, CacheEntry } from "./feed-types";
+import { loadImportedPostContent, loadImportedPosts, mergeImportedPosts } from "./local-posts";
 import { logger } from "./logger";
 
 const RSS_FEEDS: Record<string, string> = {
@@ -74,6 +75,12 @@ async function withConcurrencyLimit<T>(
 export async function fetchPostContent(url: string): Promise<string> {
   const now = Date.now();
   const cached = contentCache.get(url);
+  const importedContent = loadImportedPostContent(url);
+  if (importedContent) {
+    contentCache.set(url, { html: importedContent, ts: now });
+    return importedContent;
+  }
+
   if (cached && now - cached.ts < CONTENT_TTL) return cached.html;
   try {
     const res = await fetch(url, {
@@ -311,14 +318,17 @@ async function doFetchFeed(locale: string): Promise<BlogPost[]> {
     }
   }
 
+  const importedPosts = loadImportedPosts(locale);
+
   const allPosts = [...rssPosts, ...sitemapPosts].sort((a, b) => {
     const da = a.pubDate ? new Date(a.pubDate).getTime() : 0;
     const db = b.pubDate ? new Date(b.pubDate).getTime() : 0;
     return db - da;
   });
+  const mergedPosts = mergeImportedPosts(allPosts, importedPosts);
 
   const now = Date.now();
-  const posts = allPosts.length > 0 ? allPosts : (cache[locale]?.posts ?? []);
+  const posts = mergedPosts.length > 0 ? mergedPosts : (cache[locale]?.posts ?? []);
   const entry: CacheEntry = { posts, timestamp: now };
   cache[locale] = entry;
   saveDiskCache(locale, entry);
@@ -330,6 +340,7 @@ async function doFetchFeed(locale: string): Promise<BlogPost[]> {
       sitemapFromDisk,
       sitemapScrapeCount,
       sitemapFound: sitemapPosts.length,
+      importedCount: importedPosts.length,
       evicted,
       contentEvicted,
       totalPosts: posts.length,
