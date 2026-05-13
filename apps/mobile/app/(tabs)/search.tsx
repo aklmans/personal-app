@@ -15,6 +15,7 @@ import type { PostData } from "@/components/PostCard";
 import { PostCard } from "@/components/PostCard";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { fonts } from "@/constants/fonts";
+import { getTabScreenBottomPadding } from "@/constants/layout";
 import { useLanguage } from "@/context/LanguageContext";
 import { useColors } from "@/hooks/useColors";
 
@@ -122,10 +123,7 @@ export default function SearchScreen() {
           renderItem={renderItem}
           contentContainerStyle={[
             styles.listContent,
-            {
-              paddingBottom:
-                insets.bottom + 16 + (Platform.OS === "web" ? 34 : 0),
-            },
+            { paddingBottom: getTabScreenBottomPadding(insets.bottom) },
           ]}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
