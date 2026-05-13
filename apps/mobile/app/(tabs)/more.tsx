@@ -17,6 +17,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 
 import { useCopyToast } from "@/hooks/useCopyToast";
 import { fonts } from "@/constants/fonts";
+import { getTabScreenBottomPadding } from "@/constants/layout";
 import { useBookmarks } from "@/context/BookmarksContext";
 import { useHistory } from "@/context/HistoryContext";
 import { useLanguage } from "@/context/LanguageContext";
@@ -236,8 +237,7 @@ export default function MoreScreen() {
         styles.content,
         {
           paddingTop: topPad + 12,
-          paddingBottom:
-            insets.bottom + 24 + (Platform.OS === "web" ? 34 : 0),
+          paddingBottom: getTabScreenBottomPadding(insets.bottom, 24),
         },
       ]}
       showsVerticalScrollIndicator={false}
