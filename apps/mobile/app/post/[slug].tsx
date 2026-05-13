@@ -14,7 +14,6 @@ import {
   Text,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import WebView from "react-native-webview";
 
 import { fonts } from "@/constants/fonts";
@@ -34,11 +33,9 @@ import {
   resolveThemeColors,
 } from "@/features/post-detail/postHtml";
 import { CopyToast } from "@/features/post-detail/CopyToast";
-import { OpenOnSiteFooter } from "@/features/post-detail/OpenOnSiteFooter";
 import { styles } from "@/features/post-detail/postDetail.styles";
 import { PostHeaderActions } from "@/features/post-detail/PostHeaderActions";
 import { PostHeaderTitle } from "@/features/post-detail/PostHeaderTitle";
-import { PostMetaSection } from "@/features/post-detail/PostMetaSection";
 import { QuoteShareBar } from "@/features/post-detail/QuoteShareBar";
 import { ReadingPrefsSheet } from "@/features/post-detail/ReadingPrefsSheet";
 import { ResumeReadingBanner } from "@/features/post-detail/ResumeReadingBanner";
@@ -75,7 +72,6 @@ export default function PostDetailScreen() {
   const colors = useColors();
   const { resolved } = useTheme();
   const isDark = resolved === "dark";
-  const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const router = useRouter();
   const { slug, locale } = useLocalSearchParams<{
@@ -285,6 +281,34 @@ export default function PostDetailScreen() {
     } catch {}
   }, [post, showCopyToast]);
 
+  const handleTagPress = useCallback(
+    (tag: string) => {
+      router.push({
+        pathname: "/tag/[slug]",
+        params: {
+          slug: tag.toLowerCase().replace(/\s+/g, "-"),
+          locale: safeLocale,
+        },
+      });
+    },
+    [router, safeLocale]
+  );
+
+  const handleRelatedPress = useCallback(
+    (relatedSlug: string) => {
+      router.push({
+        pathname: "/post/[slug]",
+        params: { slug: relatedSlug, locale: safeLocale },
+      });
+    },
+    [router, safeLocale]
+  );
+
+  const openInBrowser = useCallback(async () => {
+    if (!post?.link) return;
+    await WebBrowser.openBrowserAsync(post.link);
+  }, [post?.link]);
+
   useEffect(() => {
     navigation.setOptions({
       headerStyle: { backgroundColor: themeColors.bg },
@@ -370,12 +394,24 @@ export default function PostDetailScreen() {
               iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ t: "highlight" }), "*");
             }).catch(() => {});
           }
+          return;
+        }
+        if (msg.t === "tag" && typeof msg.value === "string") {
+          handleTagPress(msg.value);
+          return;
+        }
+        if (msg.t === "related" && typeof msg.value === "string") {
+          handleRelatedPress(msg.value);
+          return;
+        }
+        if (msg.t === "open-site") {
+          openInBrowser();
         }
       } catch {}
     };
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [post, isZh, showCopyToast]);
+  }, [post, isZh, showCopyToast, handleTagPress, handleRelatedPress, openInBrowser]);
 
   useEffect(() => {
     if (Platform.OS !== "web" && webViewRef.current) {
@@ -483,16 +519,26 @@ export default function PostDetailScreen() {
   }, [colorTheme, accentColor, colors.background, colors.text, colors.primary, colors.mutedForeground]);
 
   const htmlContent = useMemo(
-    () => (post ? buildHtml(post.content ?? "", colors, isDark, 17, 1.85, "full", "serif", colorTheme, accentColor) : ""),
-    [post, colors, isDark, colorTheme, accentColor]
+    () => (post ? buildHtml(post.content ?? "", colors, isDark, 17, 1.85, "full", "serif", colorTheme, accentColor, {
+      tags: post.tags ?? [],
+      related: post.related ?? [],
+      postUrl: post.link,
+      isZh,
+    }) : ""),
+    [post, colors, isDark, colorTheme, accentColor, isZh]
   );
 
   const webHtmlContent = useMemo(
     () =>
       post
-        ? buildHtml(post.content ?? "", colors, isDark, fontSize, lineSpacing, contentWidth, fontFamily, colorTheme, accentColor)
+        ? buildHtml(post.content ?? "", colors, isDark, fontSize, lineSpacing, contentWidth, fontFamily, colorTheme, accentColor, {
+            tags: post.tags ?? [],
+            related: post.related ?? [],
+            postUrl: post.link,
+            isZh,
+          })
         : "",
-    [post, colors, isDark, fontSize, lineSpacing, contentWidth, fontFamily, colorTheme, accentColor]
+    [post, colors, isDark, fontSize, lineSpacing, contentWidth, fontFamily, colorTheme, accentColor, isZh]
   );
 
   const onWebViewMessage = useCallback(
@@ -501,6 +547,18 @@ export default function PostDetailScreen() {
         const msg = JSON.parse(event.nativeEvent.data);
         if (msg.t === "selection" && typeof msg.text === "string") {
           setSelectedQuote(msg.text);
+          return;
+        }
+        if (msg.t === "tag" && typeof msg.value === "string") {
+          handleTagPress(msg.value);
+          return;
+        }
+        if (msg.t === "related" && typeof msg.value === "string") {
+          handleRelatedPress(msg.value);
+          return;
+        }
+        if (msg.t === "open-site") {
+          openInBrowser();
           return;
         }
         if (msg.t === "scroll" && typeof msg.p === "number") {
@@ -531,7 +589,7 @@ export default function PostDetailScreen() {
         }
       } catch {}
     },
-    [progressAnim, scrollStorageKey]
+    [progressAnim, scrollStorageKey, handleTagPress, handleRelatedPress, openInBrowser]
   );
 
   const injectScrollToPos = useCallback((position: number, delay = 0) => {
@@ -695,13 +753,6 @@ export default function PostDetailScreen() {
     injectScrollToPos(position, 400);
   }, [scrollStorageKey, injectScrollToPos]);
 
-  const openInBrowser = async () => {
-    if (!post?.link) return;
-    await WebBrowser.openBrowserAsync(post.link);
-  };
-
-  const bottomPad = insets.bottom + 16 + (Platform.OS === "web" ? 34 : 0);
-
   if (isLoading) {
     return (
       <View style={[styles.root, styles.center, { backgroundColor: colors.background }]}>
@@ -725,9 +776,6 @@ export default function PostDetailScreen() {
       </View>
     );
   }
-
-  const tags = post.tags ?? [];
-  const related = post.related ?? [];
 
   return (
     <View style={[styles.root, { backgroundColor: themeColors.bg }]}>
@@ -782,29 +830,6 @@ export default function PostDetailScreen() {
         <View style={[styles.webview, { backgroundColor: themeColors.bg }]} />
       )}
 
-      <PostMetaSection
-        tags={tags}
-        related={related}
-        colors={colors}
-        themeBg={themeColors.bg}
-        isZh={isZh}
-        onTagPress={(tag) =>
-          router.push({
-            pathname: "/tag/[slug]",
-            params: {
-              slug: tag.toLowerCase().replace(/\s+/g, "-"),
-              locale: safeLocale,
-            },
-          })
-        }
-        onRelatedPress={(relatedSlug) =>
-          router.push({
-            pathname: "/post/[slug]",
-            params: { slug: relatedSlug, locale: safeLocale },
-          })
-        }
-      />
-
       {selectedQuote.length > 0 && (
         <QuoteShareBar
           selectedQuote={selectedQuote}
@@ -830,15 +855,6 @@ export default function PostDetailScreen() {
           onDismiss={dismissBanner}
         />
       )}
-
-      <OpenOnSiteFooter
-        bottomPad={bottomPad}
-        backgroundColor={themeColors.bg}
-        borderColor={colors.border}
-        primaryColor={colors.primary}
-        isZh={isZh}
-        onOpen={openInBrowser}
-      />
 
       <ReadingPrefsSheet
         visible={sheetVisible}

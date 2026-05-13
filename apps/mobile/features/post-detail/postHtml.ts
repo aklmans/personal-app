@@ -6,6 +6,65 @@ interface PostHtmlColors {
   mutedForeground: string;
   primary: string;
   border: string;
+  card: string;
+  secondary: string;
+}
+
+interface PostHtmlRelatedPost {
+  slug: string;
+  title: string;
+  categories: string[];
+}
+
+interface PostHtmlFooter {
+  tags: string[];
+  related: PostHtmlRelatedPost[];
+  postUrl: string;
+  isZh: boolean;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function buildPostFooterHtml(footer?: PostHtmlFooter): string {
+  if (!footer) return "";
+  const hasTags = footer.tags.length > 0;
+  const hasRelated = footer.related.length > 0;
+  if (!hasTags && !hasRelated && !footer.postUrl) return "";
+
+  const tagsHtml = hasTags
+    ? `<div class="post-footer-tags">${footer.tags.map((tag) =>
+        `<button class="post-footer-tag" type="button" data-post-action="tag" data-post-value="${escapeHtml(tag)}">#${escapeHtml(tag)}</button>`
+      ).join("")}</div>`
+    : "";
+
+  const relatedHtml = hasRelated
+    ? `<section class="post-footer-related">
+        <div class="post-footer-label">${footer.isZh ? "相关文章" : "RELATED POSTS"}</div>
+        ${footer.related.map((rp) =>
+          `<button class="post-footer-related-row" type="button" data-post-action="related" data-post-value="${escapeHtml(rp.slug)}">
+            <span class="post-footer-related-title">${escapeHtml(rp.title)}</span>
+            ${rp.categories.length > 0 ? `<span class="post-footer-related-cat">${escapeHtml(rp.categories[0])}</span>` : ""}
+            <span class="post-footer-chevron">›</span>
+          </button>`
+        ).join("")}
+      </section>`
+    : "";
+
+  const openHtml = footer.postUrl
+    ? `<button class="post-footer-open" type="button" data-post-action="open-site">
+        ${footer.isZh ? "在 aklman.com 上阅读" : "Open on aklman.com"}
+        <span aria-hidden="true">↗</span>
+      </button>`
+    : "";
+
+  return `<aside class="post-footer">${tagsHtml}${relatedHtml}${openHtml}</aside>`;
 }
 
 export function resolveThemeColors(
@@ -104,16 +163,42 @@ export function buildHtml(
   contentWidth: ContentWidth = "full",
   fontFamily: FontFamily = "serif",
   colorTheme: ColorTheme = "default",
-  accentColor: string | null = null
+  accentColor: string | null = null,
+  footer?: PostHtmlFooter
 ): string {
   const { bg, text } = resolveThemeColors(colorTheme, colors.background, colors.text);
   const highlightColor = resolveHighlightColor(colorTheme, accentColor);
   const primary = resolveLinkColor(colorTheme, accentColor, colors.primary);
-  const muted = colors.mutedForeground;
-  const codeBg = isDark ? "#2e2825" : "#ede8e0";
-  const border = colors.border;
+  const muted = colorTheme === "sepia"
+    ? "rgba(59,35,20,0.66)"
+    : colorTheme === "high-contrast"
+    ? "rgba(255,255,255,0.72)"
+    : colors.mutedForeground;
+  const codeBg = colorTheme === "sepia"
+    ? "#eee2d2"
+    : colorTheme === "high-contrast"
+    ? "#111111"
+    : isDark
+    ? "#2e2825"
+    : "#ede8e0";
+  const border = colorTheme === "sepia"
+    ? "rgba(59,35,20,0.14)"
+    : colorTheme === "high-contrast"
+    ? "rgba(255,255,255,0.34)"
+    : colors.border;
+  const cardBg = colorTheme === "sepia"
+    ? "#fff8ed"
+    : colorTheme === "high-contrast"
+    ? "#111111"
+    : colors.card;
+  const secondaryBg = colorTheme === "sepia"
+    ? "#eee2d2"
+    : colorTheme === "high-contrast"
+    ? "#111111"
+    : colors.secondary;
   const bodyMaxWidth = contentWidth === "narrow" ? "680px" : "100%";
   const padH = contentWidth === "narrow" ? "24px" : "20px";
+  const footerHtml = buildPostFooterHtml(footer);
 
   const prismCssUrl = isDark
     ? "https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css"
@@ -439,12 +524,89 @@ export function buildHtml(
     em { font-style: italic; }
     mark { background: rgba(218,119,86,0.18); padding: 1px 3px; border-radius: 3px; }
     sup, sub { font-size: 0.75em; }
+    .post-footer {
+      margin: 3em 0 0;
+      padding: 1.2em 0 0;
+      border-top: 1px solid ${border};
+      font-family: 'Inter', system-ui, sans-serif;
+    }
+    .post-footer-tags {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 0 0 0.9em;
+      margin: 0 -2px;
+    }
+    .post-footer-tag {
+      flex: 0 0 auto;
+      border: 1px solid ${border};
+      border-radius: 999px;
+      background: ${secondaryBg};
+      color: ${primary};
+      padding: 7px 12px;
+      font: 600 0.78rem/1 'Inter', system-ui, sans-serif;
+    }
+    .post-footer-related {
+      margin-top: 0.2em;
+    }
+    .post-footer-label {
+      color: ${muted};
+      font: 700 0.72rem/1 'Inter', system-ui, sans-serif;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.8em;
+    }
+    .post-footer-related-row {
+      width: 100%;
+      position: relative;
+      display: block;
+      text-align: left;
+      border: 1px solid ${border};
+      border-radius: 8px;
+      background: ${cardBg};
+      color: ${text};
+      padding: 12px 34px 12px 14px;
+      margin: 0 0 8px;
+      font: inherit;
+    }
+    .post-footer-related-title {
+      display: block;
+      font-family: ${fontFamily === "sans" ? "'Inter', system-ui, sans-serif" : "'Lora', Georgia, serif"};
+      font-size: 0.9rem;
+      line-height: 1.35;
+    }
+    .post-footer-related-cat {
+      display: block;
+      color: ${primary};
+      font: 500 0.74rem/1.2 'Inter', system-ui, sans-serif;
+      margin-top: 4px;
+    }
+    .post-footer-chevron {
+      position: absolute;
+      top: 50%;
+      right: 14px;
+      transform: translateY(-50%);
+      color: ${muted};
+      font-size: 1.5rem;
+      line-height: 1;
+    }
+    .post-footer-open {
+      width: 100%;
+      border: 0;
+      border-radius: 9px;
+      background: ${primary};
+      color: #ffffff;
+      margin: 1.2em 0 0;
+      padding: 13px 16px;
+      font: 700 0.94rem/1 'Inter', system-ui, sans-serif;
+    }
   </style>
 </head>
-<body>${content || "<p>No content available for this article. Tap the button below to read it in full.</p>"}
+<body>${content || "<p>No content available for this article. Tap the button below to read it in full.</p>"}${footerHtml}
 <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js" data-manual></script>
 <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
 <script>${highlightScript}</script>
+<script>(function(){function postAction(action,value){var payload=JSON.stringify({t:action,value:value||''});if(window.ReactNativeWebView){window.ReactNativeWebView.postMessage(payload);}else{window.parent.postMessage(payload,'*');}}document.addEventListener('click',function(e){var el=e.target;while(el&&el!==document&&(!el.getAttribute||!el.getAttribute('data-post-action'))){el=el.parentNode;}if(!el||el===document||!el.getAttribute)return;var action=el.getAttribute('data-post-action');if(!action)return;e.preventDefault();postAction(action,el.getAttribute('data-post-value')||'');});})()</script>
 <script>(function(){var selTimer;document.addEventListener('selectionchange',function(){clearTimeout(selTimer);selTimer=setTimeout(function(){var sel=window.getSelection?window.getSelection().toString().trim():'';window.parent.postMessage(JSON.stringify({t:'selection',text:sel}),'*');},300);});})()</script>
 <script>(function(){window.addEventListener('message',function(e){if(e.source!==window.parent)return;try{var d=JSON.parse(e.data);}catch(err){return;}if(d.t!=='highlight')return;var hc=getComputedStyle(document.documentElement).getPropertyValue('--highlight-color').trim()||'rgba(218,119,86,0.35)';var tbg=getComputedStyle(document.documentElement).getPropertyValue('--theme-bg').trim()||'transparent';var sel=window.getSelection();if(!sel||sel.rangeCount===0)return;var range=sel.getRangeAt(0);var mark=document.createElement('span');mark.style.cssText='background:'+hc+';border-radius:2px;transition:background 1.5s ease-out';try{var frag=range.extractContents();mark.appendChild(frag);range.insertNode(mark);sel.removeAllRanges();setTimeout(function(){mark.style.background=tbg;setTimeout(function(){var p=mark.parentNode;if(p){while(mark.firstChild)p.insertBefore(mark.firstChild,mark);p.removeChild(mark);}},1500);},50);}catch(err){document.body.style.transition='background 0.3s ease';document.body.style.background=hc;setTimeout(function(){document.body.style.background=tbg;},700);}});})()</script>
 </body>
