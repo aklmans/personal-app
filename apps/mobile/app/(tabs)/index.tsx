@@ -20,6 +20,8 @@ import type { PostData } from "@/components/PostCard";
 import { PostCard } from "@/components/PostCard";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { fonts } from "@/constants/fonts";
+import { getTabScreenBottomPadding } from "@/constants/layout";
+import { resolvePostCoverImageUri } from "@/constants/postCover";
 import { useHistory } from "@/context/HistoryContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { usePaginatedPosts } from "@/hooks/usePaginatedPosts";
@@ -167,17 +169,11 @@ export default function HomeScreen() {
                       },
                     ]}
                   >
-                    {item.coverImage ? (
-                      <Image
-                        source={{ uri: item.coverImage }}
-                        style={styles.continueCover}
-                        resizeMode="cover"
-                      />
-                    ) : (
-                      <View
-                        style={[styles.continueCover, { backgroundColor: colors.muted }]}
-                      />
-                    )}
+                    <Image
+                      source={{ uri: resolvePostCoverImageUri(item.coverImage) }}
+                      style={[styles.continueCover, { backgroundColor: colors.muted }]}
+                      resizeMode="cover"
+                    />
                     <View style={styles.continueCardBody}>
                       <Text
                         style={[
@@ -236,7 +232,7 @@ export default function HomeScreen() {
         ListFooterComponent={ListFooter}
         contentContainerStyle={[
           styles.listContent,
-          { paddingBottom: insets.bottom + 16 + (Platform.OS === "web" ? 34 : 0) },
+          { paddingBottom: getTabScreenBottomPadding(insets.bottom) },
         ]}
         showsVerticalScrollIndicator={false}
         scrollEnabled={!isLoading}
@@ -338,25 +334,25 @@ const styles = StyleSheet.create({
   },
   continueScroll: {
     paddingHorizontal: 16,
-    gap: 10,
+    gap: 12,
   },
   continueCard: {
-    width: 148,
+    width: 184,
     borderRadius: 8,
     borderWidth: StyleSheet.hairlineWidth,
     overflow: "hidden",
   },
   continueCover: {
     width: "100%",
-    height: 84,
+    height: 104,
   },
   continueCardBody: {
-    padding: 8,
+    padding: 10,
     gap: 4,
   },
   continueTitle: {
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 19,
   },
   continueMeta: {
     fontSize: 11,

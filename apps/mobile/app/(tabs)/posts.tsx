@@ -21,6 +21,7 @@ import type { PostData } from "@/components/PostCard";
 import { PostCard } from "@/components/PostCard";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { fonts } from "@/constants/fonts";
+import { getTabScreenBottomPadding } from "@/constants/layout";
 import { useLanguage } from "@/context/LanguageContext";
 import { useNotifications } from "@/context/NotificationsContext";
 import { usePaginatedPosts } from "@/hooks/usePaginatedPosts";
@@ -174,7 +175,7 @@ export default function PostsScreen() {
         ListFooterComponent={ListFooter}
         contentContainerStyle={[
           styles.listContent,
-          { paddingBottom: insets.bottom + 16 + (Platform.OS === "web" ? 34 : 0) },
+          { paddingBottom: getTabScreenBottomPadding(insets.bottom) },
         ]}
         showsVerticalScrollIndicator={false}
         scrollEnabled={allPosts.length > 0}
